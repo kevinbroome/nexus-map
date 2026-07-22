@@ -1,4 +1,4 @@
-import { createTileId } from "../world/worldState";
+import { getTileId, parseTileId } from "../world/coordinates";
 import type { WorldState } from "../world/worldTypes";
 import {
   createEmptySelection,
@@ -6,21 +6,9 @@ import {
   type SelectionState,
 } from "./selectionTypes";
 
-function parseTileCoordinates(tileId: string): { x: number; y: number } {
-  const [xValue, yValue] = tileId.split(",");
-  const x = Number(xValue);
-  const y = Number(yValue);
-
-  if (Number.isNaN(x) || Number.isNaN(y)) {
-    throw new Error(`Invalid tile id: "${tileId}".`);
-  }
-
-  return { x, y };
-}
-
 function areTilesAdjacent(firstId: string, secondId: string): boolean {
-  const first = parseTileCoordinates(firstId);
-  const second = parseTileCoordinates(secondId);
+  const first = parseTileId(firstId);
+  const second = parseTileId(secondId);
 
   return (
     Math.abs(first.x - second.x) + Math.abs(first.y - second.y) === 1
@@ -53,7 +41,7 @@ function getTilesInRectangle(
 
   for (let y = minY; y <= maxY; y++) {
     for (let x = minX; x <= maxX; x++) {
-      const tileId = createTileId(x, y);
+      const tileId = getTileId(x, y);
 
       if (world.tiles[tileId]) {
         tileIds.push(tileId);

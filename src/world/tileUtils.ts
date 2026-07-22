@@ -19,7 +19,7 @@ export function normalizeWorldAction(action: WorldAction): WorldAction {
     resolvedValues: action.resolvedValues ?? {},
     changes: action.changes.map((change) => ({
       tileId: change.tileId,
-      before: normalizeMapTile(change.before),
+      before: change.before ? normalizeMapTile(change.before) : null,
       after: normalizeMapTile(change.after),
     })),
   };

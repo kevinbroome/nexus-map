@@ -19,6 +19,8 @@ export function getTerrainColour(terrain: MapTile["terrain"]): string {
       return "#827b72";
     case "urban":
       return "#a59181";
+    case "chasm":
+      return "#2f2a24";
     default:
       return "#d8d0b8";
   }

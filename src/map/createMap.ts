@@ -1,18 +1,24 @@
 import L from "leaflet";
+import { getWorldBoundsOrDefault } from "../world/bounds";
+import { getExistingTiles } from "../world/coordinates";
 import type { WorldState } from "../world/worldTypes";
-import {
-  GRID_HEIGHT,
-  GRID_WIDTH,
-  TILE_SIZE,
-  WORLD_PIXEL_HEIGHT,
-  WORLD_PIXEL_WIDTH,
-} from "./mapConfig";
+import { TILE_SIZE } from "./mapConfig";
+import { getRenderableTileIds, worldBoundsToLeafletBounds } from "./mapBounds";
 import { createTileLayer, type TileHighlightState } from "./tileLayer";
 
 export type WorldMapView = {
   map: L.Map;
   tileLayerGroup: L.LayerGroup;
 };
+
+export function syncMapViewport(map: L.Map, world: WorldState): void {
+  const bounds = getWorldBoundsOrDefault(world);
+  const [southWest, northEast] = worldBoundsToLeafletBounds(bounds);
+  const leafletBounds = L.latLngBounds(southWest, northEast);
+
+  map.setMaxBounds(leafletBounds.pad(0.25));
+  map.fitBounds(leafletBounds, { animate: false });
+}
 
 export function createWorldMap(
   containerId: string,
@@ -27,13 +33,7 @@ export function createWorldMap(
     zoomControl: true,
   });
 
-  const bounds = L.latLngBounds(
-    [0, 0],
-    [world.height * TILE_SIZE, world.width * TILE_SIZE],
-  );
-
-  map.setMaxBounds(bounds.pad(0.25));
-  map.fitBounds(bounds);
+  syncMapViewport(map, world);
 
   const tileLayerGroup = L.layerGroup().addTo(map);
 
@@ -50,35 +50,19 @@ export function renderWorldTiles(
 ): void {
   tileLayerGroup.clearLayers();
 
-  for (let y = 0; y < world.height; y++) {
-    for (let x = 0; x < world.width; x++) {
-      const tile = world.tiles[`${x},${y}`];
+  for (const tileId of getRenderableTileIds(world)) {
+    const tile = world.tiles[tileId];
 
-      if (!tile) {
-        continue;
-      }
-
-      createTileLayer(tile, highlights, onSelect).addTo(tileLayerGroup);
+    if (!tile) {
+      continue;
     }
+
+    createTileLayer(tile, highlights, onSelect).addTo(tileLayerGroup);
   }
 }
 
-export function getDefaultWorldDimensions(): {
-  width: number;
-  height: number;
-} {
-  return {
-    width: GRID_WIDTH,
-    height: GRID_HEIGHT,
-  };
+export function getRenderedTileCount(world: WorldState): number {
+  return getExistingTiles(world).length;
 }
 
-export function getDefaultWorldPixelSize(): {
-  width: number;
-  height: number;
-} {
-  return {
-    width: WORLD_PIXEL_WIDTH,
-    height: WORLD_PIXEL_HEIGHT,
-  };
-}
+export { TILE_SIZE };

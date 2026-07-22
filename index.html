@@ -49,6 +49,23 @@
           <button id="draw-card" type="button">Draw card</button>
         </div>
 
+        <section id="dev-tools">
+          <h2>Developer tools</h2>
+          <div class="dev-actions">
+            <button id="dev-expand-tile" type="button">
+              Create adjacent tile (dev)
+            </button>
+            <button id="export-world" type="button">Export JSON</button>
+            <button id="import-world" type="button">Import JSON</button>
+            <input
+              id="import-input"
+              type="file"
+              accept="application/json,.json"
+              hidden
+            />
+          </div>
+        </section>
+
         <section id="card-panel" hidden>
           <h2 id="card-name"></h2>
           <p id="card-description"></p>

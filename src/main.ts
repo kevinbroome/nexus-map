@@ -4,11 +4,15 @@ import "./style.css";
 import { drawRandomCard } from "./cards/drawCard";
 import {
   createWorldMap,
-  getDefaultWorldDimensions,
   renderWorldTiles,
+  syncMapViewport,
   type WorldMapView,
 } from "./map/createMap";
 import type { TileHighlightState } from "./map/tileLayer";
+import {
+  exportWorldToFile,
+  importWorldFromFile,
+} from "./persistence/worldExport";
 import {
   clearSavedWorld,
   loadWorld,
@@ -34,7 +38,12 @@ import {
   type AppState,
 } from "./ui/sidebar";
 import { commitWorldAction } from "./world/commitWorldAction";
-import { createWorld } from "./world/worldState";
+import { commitTileCreation } from "./world/commitTileCreation";
+import {
+  getFirstMissingCardinalNeighbour,
+  isBoundaryTile,
+} from "./world/tileCreation";
+import { createStarterWorld } from "./world/worldState";
 import type { WorldState } from "./world/worldTypes";
 
 type StartupResult = {
@@ -46,8 +55,7 @@ type StartupResult = {
 function createAndSaveNewWorld(): WorldState {
   clearSavedWorld();
 
-  const { width, height } = getDefaultWorldDimensions();
-  const world = createWorld("Untitled World", width, height);
+  const world = createStarterWorld("Untitled World");
   saveWorld(world);
 
   return world;
@@ -152,6 +160,8 @@ function bootstrap(): void {
 
   function refresh(): void {
     if (worldMap && state.world) {
+      syncMapViewport(worldMap.map, state.world);
+
       renderWorldTiles(
         worldMap.tileLayerGroup,
         state.world,
@@ -286,6 +296,108 @@ function bootstrap(): void {
       proposedAction: null,
       statusMessage: `Discarded "${discardedName}".`,
     };
+    refresh();
+  });
+
+  sidebar.devExpandTileButton.addEventListener("click", () => {
+    if (!state.world) {
+      return;
+    }
+
+    const selectedTileId = state.selection.tileIds[0];
+
+    if (!selectedTileId || !isBoundaryTile(state.world, selectedTileId)) {
+      state = {
+        ...state,
+        statusMessage: "Select a boundary tile with open space beside it.",
+      };
+      refresh();
+      return;
+    }
+
+    const coordinate = getFirstMissingCardinalNeighbour(
+      state.world,
+      selectedTileId,
+    );
+
+    if (!coordinate) {
+      state = {
+        ...state,
+        statusMessage: "No missing cardinal neighbour was found.",
+      };
+      refresh();
+      return;
+    }
+
+    try {
+      const result = commitTileCreation(state.world, coordinate, "empty");
+
+      state = {
+        ...state,
+        world: result.world,
+        drawnCard: null,
+        proposedAction: null,
+        statusMessage: result.message,
+        loadError: null,
+      };
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "The action could not be saved. The world was not changed.";
+      state = { ...state, statusMessage: message };
+    }
+
+    refresh();
+  });
+
+  sidebar.exportButton.addEventListener("click", () => {
+    if (!state.world) {
+      return;
+    }
+
+    exportWorldToFile(state.world);
+    state = {
+      ...state,
+      statusMessage: `Exported "${state.world.name}".`,
+    };
+    refresh();
+  });
+
+  sidebar.importButton.addEventListener("click", () => {
+    sidebar.importInput.click();
+  });
+
+  sidebar.importInput.addEventListener("change", async () => {
+    const file = sidebar.importInput.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const importedWorld = await importWorldFromFile(file);
+      saveWorld(importedWorld);
+
+      state = {
+        world: importedWorld,
+        selection: createEmptySelection(state.selection.mode),
+        drawnCard: null,
+        proposedAction: null,
+        statusMessage: `Imported "${importedWorld.name}".`,
+        loadError: null,
+      };
+
+      if (!worldMap && state.world) {
+        mountWorldMap(state.world);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "The world could not be imported.";
+      state = { ...state, statusMessage: message };
+    }
+
+    sidebar.importInput.value = "";
     refresh();
   });
 

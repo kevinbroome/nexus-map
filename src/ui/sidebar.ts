@@ -2,7 +2,11 @@ import type { CardDefinition, ProposedAction } from "../cards/cardTypes";
 import type { WorldState } from "../world/worldTypes";
 import type { SelectionState } from "../selection/selectionTypes";
 import { getLatestActionSequence } from "../world/commitWorldAction";
-import { formatSelection } from "../selection/selection";
+import { isBoundaryTile } from "../world/tileCreation";
+import {
+  formatSelection,
+  getPrimarySelectedTileId,
+} from "../selection/selection";
 import { formatProposalMessage } from "../rules/engine";
 
 export type AppState = {
@@ -21,6 +25,10 @@ export type SidebarElements = {
   createNewWorldButton: HTMLButtonElement;
   selectionModeInputs: NodeListOf<HTMLInputElement>;
   drawCardButton: HTMLButtonElement;
+  devExpandTileButton: HTMLButtonElement;
+  exportButton: HTMLButtonElement;
+  importButton: HTMLButtonElement;
+  importInput: HTMLInputElement;
   cardPanel: HTMLElement;
   cardName: HTMLHeadingElement;
   cardDescription: HTMLParagraphElement;
@@ -44,6 +52,11 @@ export function getSidebarElements(): SidebarElements {
     'input[name="selection-mode"]',
   );
   const drawCardButton = document.querySelector<HTMLButtonElement>("#draw-card");
+  const devExpandTileButton =
+    document.querySelector<HTMLButtonElement>("#dev-expand-tile");
+  const exportButton = document.querySelector<HTMLButtonElement>("#export-world");
+  const importButton = document.querySelector<HTMLButtonElement>("#import-world");
+  const importInput = document.querySelector<HTMLInputElement>("#import-input");
   const cardPanel = document.querySelector<HTMLElement>("#card-panel");
   const cardName = document.querySelector<HTMLHeadingElement>("#card-name");
   const cardDescription = document.querySelector<HTMLParagraphElement>(
@@ -64,6 +77,10 @@ export function getSidebarElements(): SidebarElements {
     !createNewWorldButton ||
     selectionModeInputs.length === 0 ||
     !drawCardButton ||
+    !devExpandTileButton ||
+    !exportButton ||
+    !importButton ||
+    !importInput ||
     !cardPanel ||
     !cardName ||
     !cardDescription ||
@@ -81,6 +98,10 @@ export function getSidebarElements(): SidebarElements {
     createNewWorldButton,
     selectionModeInputs,
     drawCardButton,
+    devExpandTileButton,
+    exportButton,
+    importButton,
+    importInput,
     cardPanel,
     cardName,
     cardDescription,
@@ -109,6 +130,19 @@ export function renderSidebar(
 
   elements.drawCardButton.disabled = interactionsDisabled;
   elements.discardCardButton.disabled = interactionsDisabled;
+  elements.exportButton.disabled = interactionsDisabled;
+  elements.importButton.disabled = interactionsDisabled;
+
+  const selectedTileId = state.world
+    ? getPrimarySelectedTileId(state.selection)
+    : null;
+  const canExpand =
+    !!state.world &&
+    !!selectedTileId &&
+    isBoundaryTile(state.world, selectedTileId);
+
+  elements.devExpandTileButton.disabled =
+    interactionsDisabled || !canExpand;
 
   for (const input of elements.selectionModeInputs) {
     input.checked = input.value === state.selection.mode;

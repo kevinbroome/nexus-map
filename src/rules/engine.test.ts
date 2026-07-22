@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { cards } from "../cards/cardDefinitions";
-import { createWorld } from "../world/worldState";
-import { createTileId } from "../world/worldState";
+import { getTileId } from "../world/coordinates";
+import { createTestWorld } from "../world/worldState";
 import { normalizeMapTile } from "../world/tileUtils";
 import { evaluateCondition, evaluateConditions } from "./conditions";
 import { proposeAction } from "./engine";
@@ -12,7 +12,7 @@ import { commitWorldAction } from "../world/commitWorldAction";
 import * as worldStorage from "../persistence/worldStorage";
 
 describe("conditions", () => {
-  const world = createWorld("Test", 3, 3);
+  const world = createTestWorld("Test", 3, 3);
 
   it("accepts valid targets", () => {
     const tile = world.tiles["1,1"]!;
@@ -24,7 +24,7 @@ describe("conditions", () => {
   });
 
   it("rejects invalid targets", () => {
-    const flooded = createWorld("Test", 2, 2);
+    const flooded = createTestWorld("Test", 2, 2);
     flooded.tiles["0,0"] = normalizeMapTile({
       ...flooded.tiles["0,0"]!,
       terrain: "water",
@@ -39,7 +39,7 @@ describe("conditions", () => {
   });
 
   it("checks adjacent terrain", () => {
-    const worldWithWater = createWorld("Test", 3, 3);
+    const worldWithWater = createTestWorld("Test", 3, 3);
     worldWithWater.tiles["1,0"] = normalizeMapTile({
       ...worldWithWater.tiles["1,0"]!,
       terrain: "water",
@@ -55,7 +55,7 @@ describe("conditions", () => {
 });
 
 describe("targets", () => {
-  const world = createWorld("Test", 4, 4);
+  const world = createTestWorld("Test", 4, 4);
 
   it("resolves a single tile target", () => {
     expect(
@@ -77,14 +77,14 @@ describe("targets", () => {
 
     if (result.ok) {
       expect(result.targetIds.sort()).toEqual(["0,0", "0,1", "1,0"].sort());
-      expect(result.targetIds).not.toContain(createTileId(-1, 0));
+      expect(result.targetIds).not.toContain(getTileId(-1, 0));
     }
   });
 });
 
 describe("effects", () => {
   it("produces immutable updates", () => {
-    const world = createWorld("Test", 2, 2);
+    const world = createTestWorld("Test", 2, 2);
     const before = world.tiles["0,0"]!;
 
     const modified = applyEffectsToTile(
@@ -105,7 +105,7 @@ describe("engine", () => {
   it("matches preview and committed results", () => {
     vi.spyOn(worldStorage, "saveWorld").mockImplementation(() => undefined);
 
-    const world = createWorld("Test", 3, 3);
+    const world = createTestWorld("Test", 3, 3);
     const card = cards.find((entry) => entry.id === "wild-growth")!;
     const preview = proposeAction(world, card, ["1,1"], "fixed-seed");
     const committed = commitWorldAction(
@@ -124,7 +124,7 @@ describe("engine", () => {
   });
 
   it("uses seeded randomness for neighbouring terrain effects", () => {
-    const world = createWorld("Test", 3, 3);
+    const world = createTestWorld("Test", 3, 3);
     const card = {
       id: "test-random",
       name: "Random Spread",
@@ -150,7 +150,7 @@ describe("engine", () => {
   it("creates exactly one history action per commit", () => {
     vi.spyOn(worldStorage, "saveWorld").mockImplementation(() => undefined);
 
-    const world = createWorld("Test", 2, 2);
+    const world = createTestWorld("Test", 2, 2);
     const card = cards.find((entry) => entry.id === "waters-rise")!;
     const preview = proposeAction(world, card, ["0,0"], "seed-a");
     const committed = commitWorldAction(
@@ -166,7 +166,7 @@ describe("engine", () => {
   });
 
   it("previews regional forest spread without affecting water tiles", () => {
-    const world = createWorld("Test", 3, 3);
+    const world = createTestWorld("Test", 3, 3);
     world.tiles["1,1"] = normalizeMapTile({
       ...world.tiles["1,1"]!,
       terrain: "water",

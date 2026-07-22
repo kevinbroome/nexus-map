@@ -1,21 +1,15 @@
-import { type MapTile, type WorldState } from "./worldTypes";
+import { GRID_HEIGHT, GRID_WIDTH } from "../map/mapConfig";
+import { getTileId } from "./coordinates";
+import type { MapTile, WorldState } from "./worldTypes";
 import { normalizeMapTile } from "./tileUtils";
 
-export function createTileId(x: number, y: number): string {
-  return `${x},${y}`;
-}
-
-export function createWorld(
-  name: string,
-  width: number,
-  height: number,
-): WorldState {
+export function createStarterWorld(name: string): WorldState {
   const now = new Date().toISOString();
   const tiles: Record<string, MapTile> = {};
 
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const id = createTileId(x, y);
+  for (let y = 0; y < GRID_HEIGHT; y++) {
+    for (let x = 0; x < GRID_WIDTH; x++) {
+      const id = getTileId(x, y);
       tiles[id] = normalizeMapTile({
         id,
         x,
@@ -28,11 +22,44 @@ export function createWorld(
   }
 
   return {
-    version: 1,
+    version: 2,
     id: crypto.randomUUID(),
     name,
-    width,
-    height,
+    tiles,
+    history: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+export function createTestWorld(
+  name: string,
+  width: number,
+  height: number,
+  originX = 0,
+  originY = 0,
+): WorldState {
+  const now = new Date().toISOString();
+  const tiles: Record<string, MapTile> = {};
+
+  for (let y = originY; y < originY + height; y++) {
+    for (let x = originX; x < originX + width; x++) {
+      const id = getTileId(x, y);
+      tiles[id] = normalizeMapTile({
+        id,
+        x,
+        y,
+        terrain: "empty",
+        tags: [],
+        properties: {},
+      });
+    }
+  }
+
+  return {
+    version: 2,
+    id: "test-world-id",
+    name,
     tiles,
     history: [],
     createdAt: now,

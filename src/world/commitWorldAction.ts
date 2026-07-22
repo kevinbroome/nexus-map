@@ -86,7 +86,7 @@ export function commitWorldAction(
     appliedAt: new Date().toISOString(),
     changes: proposal.changes.map((change) => ({
       tileId: change.tileId,
-      before: cloneValue(change.before),
+      before: change.before ? cloneValue(change.before) : null,
       after: cloneValue(change.after),
     })),
     randomSeed: proposal.randomSeed,

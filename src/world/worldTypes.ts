@@ -4,7 +4,8 @@ export type TerrainType =
   | "grassland"
   | "forest"
   | "mountain"
-  | "urban";
+  | "urban"
+  | "chasm";
 
 export type SettlementType = "village" | "town" | "city";
 
@@ -25,7 +26,7 @@ export interface MapTile {
 
 export interface TileChange {
   tileId: string;
-  before: MapTile;
+  before: MapTile | null;
   after: MapTile;
 }
 
@@ -42,6 +43,18 @@ export interface WorldAction {
 }
 
 export interface WorldState {
+  version: 2;
+  id: string;
+  name: string;
+  tiles: Record<string, MapTile>;
+  history: WorldAction[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const CURRENT_WORLD_VERSION = 2 as const;
+
+export type LegacyWorldStateV1 = {
   version: 1;
   id: string;
   name: string;
@@ -51,6 +64,4 @@ export interface WorldState {
   history: WorldAction[];
   createdAt: string;
   updatedAt: string;
-}
-
-export const CURRENT_WORLD_VERSION = 1 as const;
+};

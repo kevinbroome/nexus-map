@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createWorld } from "../world/worldState";
+import { createTestWorld } from "../world/worldState";
 import {
   handleTileSelection,
   setSelectionMode,
@@ -7,7 +7,7 @@ import {
 import { createEmptySelection } from "./selectionTypes";
 
 describe("selection", () => {
-  const world = createWorld("Test", 4, 4);
+  const world = createTestWorld("Test", 4, 4);
 
   it("selects a single tile in single mode", () => {
     const selection = handleTileSelection(

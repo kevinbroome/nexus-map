@@ -1,4 +1,4 @@
-import { createTileId } from "../world/worldState";
+import { getTileId } from "../world/coordinates";
 import type { MapTile, WorldState } from "../world/worldTypes";
 import type { TargetDefinition } from "../cards/cardTypes";
 
@@ -19,7 +19,7 @@ function getTileNeighbours(
   ];
 
   for (const [offsetX, offsetY] of offsets) {
-    const neighbour = world.tiles[createTileId(tile.x + offsetX, tile.y + offsetY)];
+    const neighbour = world.tiles[getTileId(tile.x + offsetX, tile.y + offsetY)];
 
     if (neighbour) {
       neighbours.push(neighbour);
