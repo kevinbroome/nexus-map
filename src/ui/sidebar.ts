@@ -2,6 +2,12 @@ import type { CardDefinition, ProposedAction } from "../cards/cardTypes";
 import type { WorldState } from "../world/worldTypes";
 import type { SelectionState } from "../selection/selectionTypes";
 import { getLatestActionSequence } from "../world/commitWorldAction";
+import {
+  getConnectedRegion,
+  getConnectedSettlementCluster,
+  getExistingNeighbours,
+  matchesTerrain,
+} from "../world/neighbours";
 import { isBoundaryTile } from "../world/tileCreation";
 import {
   formatSelection,
@@ -35,6 +41,10 @@ export type SidebarElements = {
   cardValidation: HTMLParagraphElement;
   applyCardButton: HTMLButtonElement;
   discardCardButton: HTMLButtonElement;
+  devInspectionCardinal: HTMLParagraphElement;
+  devInspectionAll: HTMLParagraphElement;
+  devInspectionRegion: HTMLParagraphElement;
+  devInspectionSettlement: HTMLParagraphElement;
 };
 
 export function getSidebarElements(): SidebarElements {
@@ -69,6 +79,18 @@ export function getSidebarElements(): SidebarElements {
     document.querySelector<HTMLButtonElement>("#apply-card");
   const discardCardButton =
     document.querySelector<HTMLButtonElement>("#discard-card");
+  const devInspectionCardinal = document.querySelector<HTMLParagraphElement>(
+    "#dev-inspection-cardinal",
+  );
+  const devInspectionAll = document.querySelector<HTMLParagraphElement>(
+    "#dev-inspection-all",
+  );
+  const devInspectionRegion = document.querySelector<HTMLParagraphElement>(
+    "#dev-inspection-region",
+  );
+  const devInspectionSettlement = document.querySelector<HTMLParagraphElement>(
+    "#dev-inspection-settlement",
+  );
 
   if (
     !selectedLocation ||
@@ -86,7 +108,11 @@ export function getSidebarElements(): SidebarElements {
     !cardDescription ||
     !cardValidation ||
     !applyCardButton ||
-    !discardCardButton
+    !discardCardButton ||
+    !devInspectionCardinal ||
+    !devInspectionAll ||
+    !devInspectionRegion ||
+    !devInspectionSettlement
   ) {
     throw new Error("Sidebar elements are missing from the page.");
   }
@@ -108,6 +134,10 @@ export function getSidebarElements(): SidebarElements {
     cardValidation,
     applyCardButton,
     discardCardButton,
+    devInspectionCardinal,
+    devInspectionAll,
+    devInspectionRegion,
+    devInspectionSettlement,
   };
 }
 
@@ -143,6 +173,40 @@ export function renderSidebar(
 
   elements.devExpandTileButton.disabled =
     interactionsDisabled || !canExpand;
+
+  if (state.world && selectedTileId && state.world.tiles[selectedTileId]) {
+    const selectedTile = state.world.tiles[selectedTileId]!;
+    const cardinalCount = getExistingNeighbours(
+      state.world,
+      selectedTileId,
+      "cardinal",
+    ).length;
+    const allCount = getExistingNeighbours(
+      state.world,
+      selectedTileId,
+      "all",
+    ).length;
+    const regionCount = getConnectedRegion(
+      state.world,
+      selectedTileId,
+      matchesTerrain(selectedTile.terrain),
+      "cardinal",
+    ).length;
+    const settlementCount = selectedTile.settlement
+      ? getConnectedSettlementCluster(state.world, selectedTileId, "cardinal")
+          .length
+      : 0;
+
+    elements.devInspectionCardinal.textContent = `Cardinal neighbours: ${cardinalCount}`;
+    elements.devInspectionAll.textContent = `All neighbours: ${allCount}`;
+    elements.devInspectionRegion.textContent = `Connected terrain region: ${regionCount}`;
+    elements.devInspectionSettlement.textContent = `Settlement cluster: ${settlementCount}`;
+  } else {
+    elements.devInspectionCardinal.textContent = "Cardinal neighbours: —";
+    elements.devInspectionAll.textContent = "All neighbours: —";
+    elements.devInspectionRegion.textContent = "Connected terrain region: —";
+    elements.devInspectionSettlement.textContent = "Settlement cluster: —";
+  }
 
   for (const input of elements.selectionModeInputs) {
     input.checked = input.value === state.selection.mode;

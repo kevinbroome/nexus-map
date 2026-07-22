@@ -2,7 +2,7 @@ import type { EffectDefinition } from "../cards/cardTypes";
 import type { MapTile, SettlementType } from "../world/worldTypes";
 import { cloneTile, tilesAreEqual } from "../world/tileUtils";
 import type { WorldState } from "../world/worldTypes";
-import { getOrthogonalNeighbourIds } from "./targets";
+import { getExistingNeighbourIds } from "../world/neighbours";
 import { createSeededRandom, pickRandomItems } from "./random";
 
 const SETTLEMENT_ORDER: SettlementType[] = ["village", "town", "city"];
@@ -64,12 +64,14 @@ export function applyEffectToTile(
       return updatedTile;
 
     case "change-neighbouring-terrain": {
-      const neighbourIds = getOrthogonalNeighbourIds(context.world, tile).filter(
-        (neighbourId) => {
-          const neighbour = context.world.tiles[neighbourId];
-          return neighbour && neighbour.terrain !== effect.terrain;
-        },
-      );
+      const neighbourIds = getExistingNeighbourIds(
+        context.world,
+        tile,
+        "cardinal",
+      ).filter((neighbourId) => {
+        const neighbour = context.world.tiles[neighbourId];
+        return neighbour && neighbour.terrain !== effect.terrain;
+      });
       const pickedIds = pickRandomItems(
         neighbourIds,
         effect.count,

@@ -112,15 +112,41 @@ body {
   opacity: 0.6;
 }
 
-#dev-tools {
+#dev-tools.dev-tools-accordion {
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid #ccc;
 }
 
-#dev-tools h2 {
-  margin: 0 0 0.75rem;
+#dev-tools summary {
+  cursor: pointer;
   font-size: 1rem;
+  font-weight: 700;
+  list-style: none;
+}
+
+#dev-tools summary::-webkit-details-marker {
+  display: none;
+}
+
+#dev-tools[open] summary {
+  margin-bottom: 0.75rem;
+}
+
+.dev-inspection {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px dashed #ccc;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.dev-inspection p {
+  margin: 0 0 0.35rem;
+}
+
+.dev-inspection p:last-child {
+  margin-bottom: 0;
 }
 
 .dev-actions {

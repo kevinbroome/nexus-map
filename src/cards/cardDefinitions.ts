@@ -36,4 +36,13 @@ export const cards: CardDefinition[] = [
     conditions: [{ type: "terrain-is-not", terrain: "water" }],
     effects: [{ type: "set-terrain", terrain: "forest" }],
   },
+  {
+    id: "wild-consumes-itself",
+    name: "The Wild Consumes Itself",
+    description:
+      "Mark every tile in the connected forest region with the ancient tag.",
+    target: { type: "connected-region", terrain: "forest" },
+    conditions: [{ type: "terrain-is", terrain: "forest" }],
+    effects: [{ type: "add-tag", tag: "ancient" }],
+  },
 ];

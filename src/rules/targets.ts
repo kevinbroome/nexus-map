@@ -1,63 +1,14 @@
-import { getTileId } from "../world/coordinates";
-import type { MapTile, WorldState } from "../world/worldTypes";
 import type { TargetDefinition } from "../cards/cardTypes";
+import {
+  getConnectedRegion,
+  getExistingTilesWithinGraphSteps,
+  matchesTerrain,
+} from "../world/neighbours";
+import type { WorldState } from "../world/worldTypes";
 
 export type TargetResolution =
   | { ok: true; targetIds: string[] }
   | { ok: false; messages: string[] };
-
-function getTileNeighbours(
-  world: WorldState,
-  tile: MapTile,
-): MapTile[] {
-  const neighbours: MapTile[] = [];
-  const offsets = [
-    [0, -1],
-    [1, 0],
-    [0, 1],
-    [-1, 0],
-  ];
-
-  for (const [offsetX, offsetY] of offsets) {
-    const neighbour = world.tiles[getTileId(tile.x + offsetX, tile.y + offsetY)];
-
-    if (neighbour) {
-      neighbours.push(neighbour);
-    }
-  }
-
-  return neighbours;
-}
-
-function collectTilesWithinRadius(
-  world: WorldState,
-  anchor: MapTile,
-  radius: number,
-): string[] {
-  const tileIds = new Set<string>();
-  tileIds.add(anchor.id);
-
-  let frontier = [anchor];
-
-  for (let step = 0; step < radius; step++) {
-    const nextFrontier: MapTile[] = [];
-
-    for (const tile of frontier) {
-      for (const neighbour of getTileNeighbours(world, tile)) {
-        if (tileIds.has(neighbour.id)) {
-          continue;
-        }
-
-        tileIds.add(neighbour.id);
-        nextFrontier.push(neighbour);
-      }
-    }
-
-    frontier = nextFrontier;
-  }
-
-  return [...tileIds];
-}
 
 export function resolveCardTargets(
   world: WorldState,
@@ -105,13 +56,61 @@ export function resolveCardTargets(
         return { ok: false, messages: ["Selected tile does not exist."] };
       }
 
+      const targetTiles = getExistingTilesWithinGraphSteps(
+        world,
+        anchorId,
+        target.radius,
+        "cardinal",
+      );
+
       return {
         ok: true,
-        targetIds: collectTilesWithinRadius(world, anchor, target.radius),
+        targetIds: targetTiles.map((tile) => tile.id),
       };
     }
 
-    case "connected-region":
+    case "connected-region": {
+      if (selectionTileIds.length === 0) {
+        return { ok: false, messages: ["Select a tile first."] };
+      }
+
+      if (selectionTileIds.length > 1) {
+        return {
+          ok: false,
+          messages: ["This card requires exactly one anchor tile."],
+        };
+      }
+
+      const anchorId = selectionTileIds[0]!;
+      const anchor = world.tiles[anchorId];
+
+      if (!anchor) {
+        return { ok: false, messages: ["Selected tile does not exist."] };
+      }
+
+      const terrain = target.terrain ?? anchor.terrain;
+      const region = getConnectedRegion(
+        world,
+        anchorId,
+        matchesTerrain(terrain),
+        "cardinal",
+      );
+
+      if (region.length === 0) {
+        return {
+          ok: false,
+          messages: [
+            `No connected ${terrain} region starts at the selected tile.`,
+          ],
+        };
+      }
+
+      return {
+        ok: true,
+        targetIds: region.map((tile) => tile.id),
+      };
+    }
+
     case "rectangle":
     case "settlement":
     case "global":
@@ -128,11 +127,4 @@ export function resolveCardTargets(
       };
     }
   }
-}
-
-export function getOrthogonalNeighbourIds(
-  world: WorldState,
-  tile: MapTile,
-): string[] {
-  return getTileNeighbours(world, tile).map((neighbour) => neighbour.id);
 }

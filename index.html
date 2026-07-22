@@ -49,8 +49,8 @@
           <button id="draw-card" type="button">Draw card</button>
         </div>
 
-        <section id="dev-tools">
-          <h2>Developer tools</h2>
+        <details id="dev-tools" class="dev-tools-accordion">
+          <summary>Developer tools</summary>
           <div class="dev-actions">
             <button id="dev-expand-tile" type="button">
               Create adjacent tile (dev)
@@ -64,7 +64,13 @@
               hidden
             />
           </div>
-        </section>
+          <div id="dev-inspection" class="dev-inspection">
+            <p id="dev-inspection-cardinal">Cardinal neighbours: —</p>
+            <p id="dev-inspection-all">All neighbours: —</p>
+            <p id="dev-inspection-region">Connected terrain region: —</p>
+            <p id="dev-inspection-settlement">Settlement cluster: —</p>
+          </div>
+        </details>
 
         <section id="card-panel" hidden>
           <h2 id="card-name"></h2>

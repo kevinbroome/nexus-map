@@ -1,15 +1,15 @@
 import type { ConditionDefinition } from "../cards/cardTypes";
+import { getExistingNeighbours } from "../world/neighbours";
 import type { MapTile, WorldState } from "../world/worldTypes";
-import { getOrthogonalNeighbourIds } from "./targets";
 
 function countNeighboursWithTerrain(
   world: WorldState,
   tile: MapTile,
   terrain: MapTile["terrain"],
 ): number {
-  return getOrthogonalNeighbourIds(world, tile).filter((neighbourId) => {
-    return world.tiles[neighbourId]?.terrain === terrain;
-  }).length;
+  return getExistingNeighbours(world, tile.id, "cardinal").filter(
+    (neighbour) => neighbour.terrain === terrain,
+  ).length;
 }
 
 export function evaluateCondition(
@@ -31,9 +31,9 @@ export function evaluateCondition(
       return tile.settlement === undefined;
 
     case "adjacent-to-terrain":
-      return getOrthogonalNeighbourIds(world, tile).some((neighbourId) => {
-        return world.tiles[neighbourId]?.terrain === condition.terrain;
-      });
+      return getExistingNeighbours(world, tile.id, "cardinal").some(
+        (neighbour) => neighbour.terrain === condition.terrain,
+      );
 
     case "minimum-neighbours":
       return (
