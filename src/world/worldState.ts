@@ -22,10 +22,13 @@ export function createStarterWorld(name: string): WorldState {
   }
 
   return {
-    version: 2,
+    version: 4,
     id: crypto.randomUUID(),
     name,
+    turn: 0,
     tiles,
+    settlementRegions: {},
+    travelRoutes: {},
     history: [],
     createdAt: now,
     updatedAt: now,
@@ -57,10 +60,13 @@ export function createTestWorld(
   }
 
   return {
-    version: 2,
+    version: 4,
     id: "test-world-id",
     name,
+    turn: 0,
     tiles,
+    settlementRegions: {},
+    travelRoutes: {},
     history: [],
     createdAt: now,
     updatedAt: now,

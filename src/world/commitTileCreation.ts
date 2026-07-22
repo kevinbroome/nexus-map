@@ -45,6 +45,10 @@ export function commitTileCreation(
       coordinate,
       terrain,
     },
+    turn: world.turn,
+    consequences: [],
+    regionChanges: [],
+    routeChanges: [],
   };
 
   const committedWorld: WorldState = {

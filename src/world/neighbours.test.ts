@@ -269,11 +269,11 @@ describe("predicates", () => {
       x: 0,
       y: 0,
       terrain: "grassland",
-      settlement: { type: "town" },
+      settlement: { type: "village", inhospitableTurns: 0 },
     });
 
-    expect(hasSettlementType("town")(tile)).toBe(true);
-    expect(hasSettlementType("village")(tile)).toBe(false);
+    expect(hasSettlementType("village")(tile)).toBe(true);
+    expect(hasSettlementType("town")(tile)).toBe(false);
   });
 });
 

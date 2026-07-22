@@ -1,11 +1,14 @@
 import "leaflet/dist/leaflet.css";
 import "./style.css";
 
+import { cardRequiresTwoEndpoints } from "./cards/cardTypes";
+import { cards } from "./cards/cardDefinitions";
 import { drawRandomCard } from "./cards/drawCard";
 import {
   createWorldMap,
-  renderWorldTiles,
-  syncMapViewport,
+  renderWorldMap,
+  fitMapToWorld,
+  updateMapBounds,
   type WorldMapView,
 } from "./map/createMap";
 import type { TileHighlightState } from "./map/tileLayer";
@@ -19,6 +22,7 @@ import {
   saveWorld,
 } from "./persistence/worldStorage";
 import {
+  getConsequencePreviewTileIds,
   getPreviewTileIds,
   proposeAction,
 } from "./rules/engine";
@@ -39,6 +43,10 @@ import {
 } from "./ui/sidebar";
 import { commitWorldAction } from "./world/commitWorldAction";
 import { commitTileCreation } from "./world/commitTileCreation";
+import {
+  createDevScenario,
+  type DevScenarioId,
+} from "./dev/devScenarios";
 import {
   getFirstMissingCardinalNeighbour,
   isBoundaryTile,
@@ -100,6 +108,7 @@ function createInitialState(startup: StartupResult): AppState {
     selection: createEmptySelection("single"),
     drawnCard: null,
     proposedAction: null,
+    selectedRouteId: null,
     statusMessage: startup.statusMessage,
     loadError: startup.loadError,
   };
@@ -115,15 +124,34 @@ function buildProposal(state: AppState) {
     state.drawnCard,
     state.selection.tileIds,
     state.proposedAction?.randomSeed ?? createRandomSeed(),
+    state.selection,
   );
 }
 
 function getTileHighlights(state: AppState): TileHighlightState {
+  const routeOrigin = new Set<string>();
+  const routeDestination = new Set<string>();
+
+  if (state.selection.routeOriginTileId) {
+    routeOrigin.add(state.selection.routeOriginTileId);
+  }
+
+  if (state.selection.routeDestinationTileId) {
+    routeDestination.add(state.selection.routeDestinationTileId);
+  }
+
   return {
     selected: new Set(state.selection.tileIds),
     preview: new Set(
       state.proposedAction ? getPreviewTileIds(state.proposedAction) : [],
     ),
+    consequencePreview: new Set(
+      state.proposedAction
+        ? getConsequencePreviewTileIds(state.proposedAction)
+        : [],
+    ),
+    routeOrigin,
+    routeDestination,
   };
 }
 
@@ -133,24 +161,37 @@ function bootstrap(): void {
   let state = createInitialState(startup);
   let worldMap: WorldMapView | null = null;
 
+  function onTileSelect(tileId: string): void {
+    if (!state.world) {
+      return;
+    }
+
+    state = {
+      ...state,
+      selection: handleTileSelection(state.world, state.selection, tileId),
+      proposedAction: null,
+      selectedRouteId: null,
+    };
+    state.proposedAction = buildProposal(state);
+    refresh();
+  }
+
+  function onRouteSelect(routeId: string): void {
+    state = {
+      ...state,
+      selectedRouteId: routeId,
+      statusMessage: `Selected route ${routeId}.`,
+    };
+    refresh();
+  }
+
   function mountWorldMap(world: WorldState): void {
     worldMap = createWorldMap(
       "map",
       world,
       getTileHighlights(state),
-      (tileId) => {
-        if (!state.world) {
-          return;
-        }
-
-        state = {
-          ...state,
-          selection: handleTileSelection(state.world, state.selection, tileId),
-          proposedAction: null,
-        };
-        state.proposedAction = buildProposal(state);
-        refresh();
-      },
+      onTileSelect,
+      onRouteSelect,
     );
   }
 
@@ -158,27 +199,21 @@ function bootstrap(): void {
     mountWorldMap(state.world);
   }
 
-  function refresh(): void {
+  function refresh(options?: { fitMap?: boolean }): void {
     if (worldMap && state.world) {
-      syncMapViewport(worldMap.map, state.world);
+      if (options?.fitMap) {
+        fitMapToWorld(worldMap.map, state.world);
+      } else {
+        updateMapBounds(worldMap.map, state.world);
+      }
 
-      renderWorldTiles(
-        worldMap.tileLayerGroup,
+      renderWorldMap(
+        worldMap,
         state.world,
         getTileHighlights(state),
-        (tileId) => {
-          if (!state.world) {
-            return;
-          }
-
-          state = {
-            ...state,
-            selection: handleTileSelection(state.world, state.selection, tileId),
-            proposedAction: null,
-          };
-          state.proposedAction = buildProposal(state);
-          refresh();
-        },
+        onTileSelect,
+        onRouteSelect,
+        state.proposedAction?.proposedRoutes[0]?.route ?? null,
       );
     }
 
@@ -188,6 +223,7 @@ function bootstrap(): void {
   sidebar.createNewWorldButton.addEventListener("click", () => {
     try {
       const world = createAndSaveNewWorld();
+      const hadMap = Boolean(worldMap);
 
       if (!worldMap) {
         mountWorldMap(world);
@@ -198,9 +234,13 @@ function bootstrap(): void {
         selection: createEmptySelection("single"),
         drawnCard: null,
         proposedAction: null,
+        selectedRouteId: null,
         statusMessage: "New world created and saved.",
         loadError: null,
       };
+
+      refresh({ fitMap: hadMap });
+      return;
     } catch (error) {
       const message =
         error instanceof Error
@@ -228,6 +268,7 @@ function bootstrap(): void {
           input.value as SelectionMode,
         ),
         proposedAction: null,
+        selectedRouteId: null,
         statusMessage: `Selection mode: ${input.labels?.[0]?.textContent?.trim() ?? input.value}.`,
       };
       state.proposedAction = buildProposal(state);
@@ -241,11 +282,42 @@ function bootstrap(): void {
     }
 
     const drawnCard = drawRandomCard();
+    const selectionMode = cardRequiresTwoEndpoints(drawnCard)
+      ? "two-endpoints"
+      : state.selection.mode;
+
     state = {
       ...state,
       drawnCard,
+      selection: createEmptySelection(selectionMode),
       proposedAction: null,
-      statusMessage: `Drew "${drawnCard.name}".`,
+      selectedRouteId: null,
+      statusMessage: cardRequiresTwoEndpoints(drawnCard)
+        ? `Drew "${drawnCard.name}". Select a route origin, then a destination.`
+        : `Drew "${drawnCard.name}".`,
+    };
+    state.proposedAction = buildProposal(state);
+    refresh();
+  });
+
+  sidebar.drawRoadCardButton.addEventListener("click", () => {
+    if (!state.world) {
+      return;
+    }
+
+    const drawnCard = cards.find((card) => card.id === "the-road-between");
+
+    if (!drawnCard) {
+      return;
+    }
+
+    state = {
+      ...state,
+      drawnCard,
+      selection: createEmptySelection("two-endpoints"),
+      proposedAction: null,
+      selectedRouteId: null,
+      statusMessage: `Drew "${drawnCard.name}". Select a route origin, then a destination.`,
     };
     state.proposedAction = buildProposal(state);
     refresh();
@@ -263,6 +335,7 @@ function bootstrap(): void {
         state.selection.tileIds,
         state.proposedAction.randomSeed,
         state.proposedAction,
+        state.selection,
       );
 
       state = {
@@ -270,6 +343,7 @@ function bootstrap(): void {
         world: result.world,
         drawnCard: null,
         proposedAction: null,
+        selectedRouteId: null,
         statusMessage: result.message,
         loadError: null,
       };
@@ -294,10 +368,50 @@ function bootstrap(): void {
       ...state,
       drawnCard: null,
       proposedAction: null,
+      selectedRouteId: null,
       statusMessage: `Discarded "${discardedName}".`,
     };
     refresh();
   });
+
+  if (import.meta.env.DEV) {
+    sidebar.devLoadScenarioButton.addEventListener("click", () => {
+      try {
+        const scenarioId = sidebar.devScenarioSelect.value as DevScenarioId;
+        const world = createDevScenario(scenarioId);
+        saveWorld(world);
+        const hadMap = Boolean(worldMap);
+
+        if (!worldMap) {
+          mountWorldMap(world);
+        }
+
+        state = {
+          world,
+          selection: createEmptySelection("single"),
+          drawnCard: null,
+          proposedAction: null,
+          selectedRouteId: null,
+          statusMessage: `Loaded dev scenario "${scenarioId}".`,
+          loadError: null,
+        };
+
+        refresh({ fitMap: hadMap });
+        return;
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "The dev scenario could not be loaded.";
+        state = { ...state, statusMessage: message };
+      }
+
+      refresh();
+    });
+  } else {
+    sidebar.devScenarioSelect.hidden = true;
+    sidebar.devLoadScenarioButton.hidden = true;
+  }
 
   sidebar.devExpandTileButton.addEventListener("click", () => {
     if (!state.world) {
@@ -337,6 +451,7 @@ function bootstrap(): void {
         world: result.world,
         drawnCard: null,
         proposedAction: null,
+        selectedRouteId: null,
         statusMessage: result.message,
         loadError: null,
       };
@@ -378,12 +493,14 @@ function bootstrap(): void {
     try {
       const importedWorld = await importWorldFromFile(file);
       saveWorld(importedWorld);
+      const hadMap = Boolean(worldMap);
 
       state = {
         world: importedWorld,
         selection: createEmptySelection(state.selection.mode),
         drawnCard: null,
         proposedAction: null,
+        selectedRouteId: null,
         statusMessage: `Imported "${importedWorld.name}".`,
         loadError: null,
       };
@@ -391,6 +508,10 @@ function bootstrap(): void {
       if (!worldMap && state.world) {
         mountWorldMap(state.world);
       }
+
+      sidebar.importInput.value = "";
+      refresh({ fitMap: hadMap });
+      return;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "The world could not be imported.";

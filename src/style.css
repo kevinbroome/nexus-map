@@ -40,6 +40,20 @@ body {
   font-weight: 600;
 }
 
+.world-summary,
+.dev-inspection-detail {
+  margin: 0 0 0.75rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  white-space: pre-line;
+  color: #444;
+}
+
+#card-validation {
+  white-space: pre-line;
+}
+
 #status-message {
   margin: 0 0 1rem;
   color: #555;

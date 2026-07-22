@@ -1,4 +1,5 @@
 import type { TargetDefinition } from "../cards/cardTypes";
+import type { SelectionState } from "../selection/selectionTypes";
 import {
   getConnectedRegion,
   getExistingTilesWithinGraphSteps,
@@ -14,6 +15,7 @@ export function resolveCardTargets(
   world: WorldState,
   target: TargetDefinition,
   selectionTileIds: string[],
+  selection?: SelectionState,
 ): TargetResolution {
   switch (target.type) {
     case "single-tile": {
@@ -109,6 +111,39 @@ export function resolveCardTargets(
         ok: true,
         targetIds: region.map((tile) => tile.id),
       };
+    }
+
+    case "two-endpoints": {
+      const originId = selection?.routeOriginTileId;
+      const destinationId = selection?.routeDestinationTileId;
+
+      if (!originId) {
+        return { ok: false, messages: ["Select a route origin."] };
+      }
+
+      if (!destinationId) {
+        return { ok: false, messages: ["Select a route destination."] };
+      }
+
+      if (!world.tiles[originId]) {
+        return { ok: false, messages: ["Route origin tile does not exist."] };
+      }
+
+      if (!world.tiles[destinationId]) {
+        return {
+          ok: false,
+          messages: ["Route destination tile does not exist."],
+        };
+      }
+
+      if (originId === destinationId) {
+        return {
+          ok: false,
+          messages: ["Route origin and destination must differ."],
+        };
+      }
+
+      return { ok: true, targetIds: [originId, destinationId] };
     }
 
     case "rectangle":

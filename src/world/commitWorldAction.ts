@@ -4,9 +4,10 @@ import {
   proposeAction,
   proposalsAreEqual,
 } from "../rules/engine";
+import type { SelectionState } from "../selection/selectionTypes";
 import { saveWorld } from "../persistence/worldStorage";
+import { formatConsequencesSummary } from "../worldLaws/consequenceMessages";
 import type { WorldAction, WorldState } from "./worldTypes";
-import { cloneTile } from "./tileUtils";
 
 function cloneValue<T>(value: T): T {
   return structuredClone(value);
@@ -20,24 +21,6 @@ function getNextSequence(world: WorldState): number {
   return getLatestActionSequence(world) + 1;
 }
 
-function buildUpdatedWorld(
-  world: WorldState,
-  action: WorldAction,
-): WorldState {
-  const tiles = { ...world.tiles };
-
-  for (const change of action.changes) {
-    tiles[change.tileId] = cloneTile(change.after);
-  }
-
-  return {
-    ...world,
-    tiles,
-    history: [...world.history, action],
-    updatedAt: new Date().toISOString(),
-  };
-}
-
 export type CommitResult = {
   world: WorldState;
   action: WorldAction;
@@ -45,12 +28,19 @@ export type CommitResult = {
 };
 
 export function formatCommitMessage(action: WorldAction): string {
-  const primaryChange = action.changes[0];
-  const tileLabel = primaryChange
-    ? `${primaryChange.after.x},${primaryChange.after.y}`
-    : action.targetIds[0] ?? "unknown";
+  const consequenceSummary = formatConsequencesSummary(action.consequences);
+  const routeSummary =
+    action.routeChanges.filter((change) => change.type === "created").length > 0
+      ? ["1 road created."]
+      : [];
+  const lines = [
+    `Action committed. Turn ${action.turn}.`,
+    ...routeSummary,
+    ...consequenceSummary,
+    "World saved.",
+  ];
 
-  return `Applied "${action.cardName}" to tile ${tileLabel}.\nWorld saved. Action #${action.sequence}.`;
+  return lines.join("\n");
 }
 
 export function commitWorldAction(
@@ -59,15 +49,17 @@ export function commitWorldAction(
   selectionTileIds: string[],
   randomSeed?: string,
   expectedProposal?: ReturnType<typeof proposeAction>,
+  selection?: SelectionState,
 ): CommitResult {
   const proposal = proposeAction(
     world,
     card,
     selectionTileIds,
     randomSeed,
+    selection,
   );
 
-  if (!proposal.valid) {
+  if (!proposal.valid || !proposal.resultingWorld) {
     throw new Error(formatProposalMessage(proposal));
   }
 
@@ -77,6 +69,14 @@ export function commitWorldAction(
     );
   }
 
+  const allChanges = [...proposal.cardChanges, ...proposal.consequenceChanges].map(
+    (change) => ({
+      tileId: change.tileId,
+      before: change.before ? cloneValue(change.before) : null,
+      after: cloneValue(change.after),
+    }),
+  );
+
   const action: WorldAction = {
     id: crypto.randomUUID(),
     sequence: getNextSequence(world),
@@ -84,15 +84,20 @@ export function commitWorldAction(
     cardName: card.name,
     targetIds: [...proposal.targetIds],
     appliedAt: new Date().toISOString(),
-    changes: proposal.changes.map((change) => ({
-      tileId: change.tileId,
-      before: change.before ? cloneValue(change.before) : null,
-      after: cloneValue(change.after),
-    })),
+    changes: allChanges,
     randomSeed: proposal.randomSeed,
     resolvedValues: cloneValue(proposal.resolvedValues),
+    turn: proposal.nextTurn,
+    consequences: cloneValue(proposal.consequences),
+    regionChanges: cloneValue(proposal.regionChanges),
+    routeChanges: cloneValue(proposal.routeChanges),
   };
-  const updatedWorld = buildUpdatedWorld(world, action);
+
+  const updatedWorld: WorldState = {
+    ...proposal.resultingWorld,
+    history: [...world.history, action],
+    updatedAt: new Date().toISOString(),
+  };
 
   try {
     saveWorld(updatedWorld);

@@ -1,4 +1,15 @@
-import type { TerrainType } from "../world/worldTypes";
+import type {
+  ProposedTravelRoute,
+  RouteChange,
+  TravelNodeType,
+} from "../networks/networkTypes";
+import type {
+  SettlementRegionChange,
+  TerrainType,
+  TileChange,
+  WorldConsequence,
+  WorldState,
+} from "../world/worldTypes";
 
 export type TargetDefinition =
   | { type: "single-tile" }
@@ -6,7 +17,8 @@ export type TargetDefinition =
   | { type: "connected-region"; terrain?: TerrainType }
   | { type: "rectangle"; maxWidth: number; maxHeight: number }
   | { type: "settlement" }
-  | { type: "global" };
+  | { type: "global" }
+  | { type: "two-endpoints"; allowedNodeTypes: TravelNodeType[] };
 
 export type ConditionDefinition =
   | { type: "terrain-is"; terrain: TerrainType }
@@ -26,7 +38,16 @@ export type EffectDefinition =
       terrain: TerrainType;
       count: number;
     }
-  | { type: "add-tag"; tag: string };
+  | { type: "add-tag"; tag: string }
+  | {
+      type: "create-travel-route";
+      routeType: import("../networks/networkTypes").TravelRouteType;
+      destination:
+        | { type: "selected-secondary-target" }
+        | { type: "nearest-valid-settlement" }
+        | { type: "random-valid-settlement" };
+      preferExistingNetwork?: boolean;
+    };
 
 export interface CardDefinition {
   id: string;
@@ -37,14 +58,47 @@ export interface CardDefinition {
   effects: EffectDefinition[];
 }
 
-import type { TileChange } from "../world/worldTypes";
-
 export interface ProposedAction {
   cardId: string;
   targetIds: string[];
   valid: boolean;
   validationMessages: string[];
-  changes: TileChange[];
+  cardChanges: TileChange[];
+  consequenceChanges: TileChange[];
+  regionChanges: SettlementRegionChange[];
+  routeChanges: RouteChange[];
+  consequences: WorldConsequence[];
+  proposedRoutes: ProposedTravelRoute[];
+  nextTurn: number;
+  resultingWorld: WorldState | null;
   randomSeed: string;
   resolvedValues: Record<string, unknown>;
+}
+
+export function createInvalidProposal(
+  cardId: string,
+  targetIds: string[],
+  validationMessages: string[],
+  randomSeed: string,
+): ProposedAction {
+  return {
+    cardId,
+    targetIds,
+    valid: false,
+    validationMessages,
+    cardChanges: [],
+    consequenceChanges: [],
+    regionChanges: [],
+    routeChanges: [],
+    consequences: [],
+    proposedRoutes: [],
+    nextTurn: 0,
+    resultingWorld: null,
+    randomSeed,
+    resolvedValues: {},
+  };
+}
+
+export function cardRequiresTwoEndpoints(card: CardDefinition): boolean {
+  return card.target.type === "two-endpoints";
 }

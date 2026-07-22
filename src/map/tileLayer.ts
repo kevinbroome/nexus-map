@@ -5,6 +5,9 @@ import { TILE_SIZE } from "./mapConfig";
 export type TileHighlightState = {
   selected: ReadonlySet<string>;
   preview: ReadonlySet<string>;
+  consequencePreview: ReadonlySet<string>;
+  routeOrigin: ReadonlySet<string>;
+  routeDestination: ReadonlySet<string>;
 };
 
 export function getTerrainColour(terrain: MapTile["terrain"]): string {
@@ -21,6 +24,8 @@ export function getTerrainColour(terrain: MapTile["terrain"]): string {
       return "#a59181";
     case "chasm":
       return "#2f2a24";
+    case "desert":
+      return "#c4a574";
     default:
       return "#d8d0b8";
   }
@@ -38,12 +43,33 @@ export function createTileLayer(
 
   const isSelected = highlights.selected.has(tile.id);
   const isPreview = highlights.preview.has(tile.id);
+  const isConsequencePreview = highlights.consequencePreview.has(tile.id);
+  const isRouteOrigin = highlights.routeOrigin.has(tile.id);
+  const isRouteDestination = highlights.routeDestination.has(tile.id);
 
   let borderColor = "#555";
   let borderWeight = 1;
+  let fillOpacity = 1;
+
+  if (isConsequencePreview && !isPreview) {
+    borderColor = "#7c3aed";
+    borderWeight = 2;
+    fillOpacity = 0.9;
+  }
 
   if (isPreview) {
     borderColor = "#2563eb";
+    borderWeight = 3;
+    fillOpacity = 0.85;
+  }
+
+  if (isRouteDestination) {
+    borderColor = "#15803d";
+    borderWeight = 3;
+  }
+
+  if (isRouteOrigin) {
+    borderColor = "#b45309";
     borderWeight = 3;
   }
 
@@ -56,7 +82,7 @@ export function createTileLayer(
     color: borderColor,
     weight: borderWeight,
     fillColor: getTerrainColour(tile.terrain),
-    fillOpacity: isPreview ? 0.85 : 1,
+    fillOpacity: fillOpacity,
   });
 
   if (tile.settlement) {

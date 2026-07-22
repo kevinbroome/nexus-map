@@ -1,10 +1,10 @@
 import type { CardDefinition, ProposedAction } from "../cards/cardTypes";
 import type { WorldState } from "../world/worldTypes";
+import { isRuinSettlement, isVillageSettlement } from "../world/worldTypes";
 import type { SelectionState } from "../selection/selectionTypes";
 import { getLatestActionSequence } from "../world/commitWorldAction";
 import {
   getConnectedRegion,
-  getConnectedSettlementCluster,
   getExistingNeighbours,
   matchesTerrain,
 } from "../world/neighbours";
@@ -14,24 +14,38 @@ import {
   getPrimarySelectedTileId,
 } from "../selection/selection";
 import { formatProposalMessage } from "../rules/engine";
+import { findRegionForTileAtTier } from "../worldLaws/settlementHierarchy";
+import { findRuinClusterForTile } from "../worldLaws/ruinClusters";
+import { cards } from "../cards/cardDefinitions";
+import { formatEndpointLabel } from "../networks/endpoints";
+import { getRoute, getRoutesThroughTile } from "../networks/networkQueries";
+import {
+  formatSettlementSummary,
+  getSettlementSummary,
+} from "../worldLaws/settlementSummary";
 
 export type AppState = {
   world: WorldState | null;
   selection: SelectionState;
   drawnCard: CardDefinition | null;
   proposedAction: ProposedAction | null;
+  selectedRouteId: string | null;
   statusMessage: string;
   loadError: string | null;
 };
 
 export type SidebarElements = {
   selectedLocation: HTMLParagraphElement;
+  worldSummary: HTMLPreElement;
   statusMessage: HTMLParagraphElement;
   recoveryPanel: HTMLElement;
   createNewWorldButton: HTMLButtonElement;
   selectionModeInputs: NodeListOf<HTMLInputElement>;
   drawCardButton: HTMLButtonElement;
+  drawRoadCardButton: HTMLButtonElement;
   devExpandTileButton: HTMLButtonElement;
+  devScenarioSelect: HTMLSelectElement;
+  devLoadScenarioButton: HTMLButtonElement;
   exportButton: HTMLButtonElement;
   importButton: HTMLButtonElement;
   importInput: HTMLInputElement;
@@ -45,12 +59,15 @@ export type SidebarElements = {
   devInspectionAll: HTMLParagraphElement;
   devInspectionRegion: HTMLParagraphElement;
   devInspectionSettlement: HTMLParagraphElement;
+  devInspectionSettlementDetail: HTMLPreElement;
+  devInspectionRouteDetail: HTMLPreElement;
 };
 
 export function getSidebarElements(): SidebarElements {
   const selectedLocation = document.querySelector<HTMLParagraphElement>(
     "#selected-location",
   );
+  const worldSummary = document.querySelector<HTMLPreElement>("#world-summary");
   const statusMessage = document.querySelector<HTMLParagraphElement>(
     "#status-message",
   );
@@ -62,8 +79,15 @@ export function getSidebarElements(): SidebarElements {
     'input[name="selection-mode"]',
   );
   const drawCardButton = document.querySelector<HTMLButtonElement>("#draw-card");
+  const drawRoadCardButton =
+    document.querySelector<HTMLButtonElement>("#draw-road-card");
   const devExpandTileButton =
     document.querySelector<HTMLButtonElement>("#dev-expand-tile");
+  const devScenarioSelect =
+    document.querySelector<HTMLSelectElement>("#dev-scenario-select");
+  const devLoadScenarioButton = document.querySelector<HTMLButtonElement>(
+    "#dev-load-scenario",
+  );
   const exportButton = document.querySelector<HTMLButtonElement>("#export-world");
   const importButton = document.querySelector<HTMLButtonElement>("#import-world");
   const importInput = document.querySelector<HTMLInputElement>("#import-input");
@@ -91,15 +115,25 @@ export function getSidebarElements(): SidebarElements {
   const devInspectionSettlement = document.querySelector<HTMLParagraphElement>(
     "#dev-inspection-settlement",
   );
+  const devInspectionSettlementDetail = document.querySelector<HTMLPreElement>(
+    "#dev-inspection-settlement-detail",
+  );
+  const devInspectionRouteDetail = document.querySelector<HTMLPreElement>(
+    "#dev-inspection-route-detail",
+  );
 
   if (
     !selectedLocation ||
+    !worldSummary ||
     !statusMessage ||
     !recoveryPanel ||
     !createNewWorldButton ||
     selectionModeInputs.length === 0 ||
     !drawCardButton ||
+    !drawRoadCardButton ||
     !devExpandTileButton ||
+    !devScenarioSelect ||
+    !devLoadScenarioButton ||
     !exportButton ||
     !importButton ||
     !importInput ||
@@ -112,19 +146,25 @@ export function getSidebarElements(): SidebarElements {
     !devInspectionCardinal ||
     !devInspectionAll ||
     !devInspectionRegion ||
-    !devInspectionSettlement
+    !devInspectionSettlement ||
+    !devInspectionSettlementDetail ||
+    !devInspectionRouteDetail
   ) {
     throw new Error("Sidebar elements are missing from the page.");
   }
 
   return {
     selectedLocation,
+    worldSummary,
     statusMessage,
     recoveryPanel,
     createNewWorldButton,
     selectionModeInputs,
     drawCardButton,
+    drawRoadCardButton,
     devExpandTileButton,
+    devScenarioSelect,
+    devLoadScenarioButton,
     exportButton,
     importButton,
     importInput,
@@ -138,7 +178,107 @@ export function getSidebarElements(): SidebarElements {
     devInspectionAll,
     devInspectionRegion,
     devInspectionSettlement,
+    devInspectionSettlementDetail,
+    devInspectionRouteDetail,
   };
+}
+
+function formatRegionLine(
+  label: string,
+  regionId: string | undefined,
+): string {
+  return `${label}: ${regionId ?? "none"}`;
+}
+
+function formatSettlementInspection(
+  world: WorldState,
+  tileId: string,
+): string {
+  const tile = world.tiles[tileId];
+
+  if (!tile?.settlement) {
+    return "";
+  }
+
+  if (isVillageSettlement(tile.settlement)) {
+    return [
+      "Settlement: Village",
+      `Inhospitable turns: ${tile.settlement.inhospitableTurns} / 3`,
+      formatRegionLine(
+        "Town region",
+        findRegionForTileAtTier(world.settlementRegions, tileId, "town")?.id,
+      ),
+      formatRegionLine(
+        "Expanse region",
+        findRegionForTileAtTier(world.settlementRegions, tileId, "expanse")?.id,
+      ),
+      formatRegionLine(
+        "Urban region",
+        findRegionForTileAtTier(world.settlementRegions, tileId, "urban-region")
+          ?.id,
+      ),
+      formatRegionLine(
+        "Quadrant region",
+        findRegionForTileAtTier(world.settlementRegions, tileId, "quadrant")?.id,
+      ),
+      formatRegionLine(
+        "Sunder region",
+        findRegionForTileAtTier(world.settlementRegions, tileId, "sunder")?.id,
+      ),
+      "Ruin cluster: none",
+    ].join("\n");
+  }
+
+  if (isRuinSettlement(tile.settlement)) {
+    const cluster = findRuinClusterForTile(world, tileId);
+
+    return [
+      "Settlement: Ruin",
+      `Ruined on turn: ${tile.settlement.ruinedAtTurn}`,
+      `Ruin group size: ${cluster.length || 1}`,
+    ].join("\n");
+  }
+
+  return "";
+}
+
+function formatRouteInspection(
+  world: WorldState,
+  routeId: string,
+): string {
+  const route = getRoute(world, routeId);
+
+  if (!route) {
+    return "";
+  }
+
+  const cardName =
+    cards.find((card) => card.id === route.createdByCardId)?.name ??
+    route.createdByCardId;
+  const totalCost = route.properties.totalCost;
+
+  return [
+    `Type: ${route.type.charAt(0).toUpperCase()}${route.type.slice(1)}`,
+    `Created on turn: ${route.createdTurn}`,
+    `Origin: ${formatEndpointLabel(world, route.origin)}`,
+    `Destination: ${formatEndpointLabel(world, route.destination)}`,
+    `Length: ${route.pathTileIds.length} tiles`,
+    `Travel cost: ${typeof totalCost === "number" ? totalCost : "—"}`,
+    `Created by: ${cardName}`,
+  ].join("\n");
+}
+
+function formatTileRouteInspection(world: WorldState, tileId: string): string {
+  const routes = getRoutesThroughTile(world, tileId);
+
+  if (routes.length === 0) {
+    return "Routes through this tile: 0";
+  }
+
+  return [
+    `Routes through this tile: ${routes.length}`,
+    `Road IDs: ${routes.map((route) => route.id).join(", ")}`,
+  ].join("\n");
 }
 
 export function renderSidebar(
@@ -154,14 +294,20 @@ export function renderSidebar(
   elements.selectedLocation.textContent = state.world
     ? formatSelection(state.world, state.selection)
     : "Map unavailable";
+  elements.worldSummary.textContent = state.world
+    ? formatSettlementSummary(getSettlementSummary(state.world))
+    : "";
   elements.statusMessage.textContent = state.loadError ?? state.statusMessage;
   elements.statusMessage.dataset.error = state.loadError ? "true" : "false";
   elements.recoveryPanel.hidden = state.loadError === null;
 
   elements.drawCardButton.disabled = interactionsDisabled;
+  elements.drawRoadCardButton.disabled = interactionsDisabled;
   elements.discardCardButton.disabled = interactionsDisabled;
   elements.exportButton.disabled = interactionsDisabled;
   elements.importButton.disabled = interactionsDisabled;
+  elements.devScenarioSelect.disabled = interactionsDisabled;
+  elements.devLoadScenarioButton.disabled = interactionsDisabled;
 
   const selectedTileId = state.world
     ? getPrimarySelectedTileId(state.selection)
@@ -192,20 +338,33 @@ export function renderSidebar(
       matchesTerrain(selectedTile.terrain),
       "cardinal",
     ).length;
-    const settlementCount = selectedTile.settlement
-      ? getConnectedSettlementCluster(state.world, selectedTileId, "cardinal")
-          .length
-      : 0;
+    const settlementCount = selectedTile.settlement ? 1 : 0;
 
     elements.devInspectionCardinal.textContent = `Cardinal neighbours: ${cardinalCount}`;
     elements.devInspectionAll.textContent = `All neighbours: ${allCount}`;
     elements.devInspectionRegion.textContent = `Connected terrain region: ${regionCount}`;
-    elements.devInspectionSettlement.textContent = `Settlement cluster: ${settlementCount}`;
+    elements.devInspectionSettlement.textContent = `Settlement present: ${settlementCount > 0 ? "yes" : "no"}`;
+    elements.devInspectionSettlementDetail.textContent = formatSettlementInspection(
+      state.world,
+      selectedTileId,
+    );
+    elements.devInspectionRouteDetail.textContent = [
+      formatTileRouteInspection(state.world, selectedTileId),
+      state.selectedRouteId
+        ? formatRouteInspection(state.world, state.selectedRouteId)
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
   } else {
     elements.devInspectionCardinal.textContent = "Cardinal neighbours: —";
     elements.devInspectionAll.textContent = "All neighbours: —";
     elements.devInspectionRegion.textContent = "Connected terrain region: —";
-    elements.devInspectionSettlement.textContent = "Settlement cluster: —";
+    elements.devInspectionSettlement.textContent = "Settlement present: —";
+    elements.devInspectionSettlementDetail.textContent = "";
+    elements.devInspectionRouteDetail.textContent = state.world && state.selectedRouteId
+      ? formatRouteInspection(state.world, state.selectedRouteId)
+      : "";
   }
 
   for (const input of elements.selectionModeInputs) {
@@ -233,8 +392,8 @@ export function formatLoadedWorldMessage(world: WorldState): string {
   const latestAction = getLatestActionSequence(world);
 
   if (latestAction === 0) {
-    return "Loaded saved world.";
+    return `Loaded saved world. Turn ${world.turn}.`;
   }
 
-  return `Loaded saved world. Latest action #${latestAction}.`;
+  return `Loaded saved world. Turn ${world.turn}. Latest action #${latestAction}.`;
 }

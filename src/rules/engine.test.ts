@@ -118,7 +118,10 @@ describe("engine", () => {
 
     expect(preview.valid).toBe(true);
     expect(committed.world.tiles["1,1"]?.terrain).toBe("forest");
-    expect(committed.action.changes).toEqual(preview.changes);
+    expect(committed.action.changes).toEqual([
+      ...preview.cardChanges,
+      ...preview.consequenceChanges,
+    ]);
     expect(committed.action.randomSeed).toBe("fixed-seed");
     expect(committed.world.history).toHaveLength(1);
   });
@@ -176,10 +179,10 @@ describe("engine", () => {
     const preview = proposeAction(world, card, ["1,1"], "regional-seed");
 
     expect(preview.valid).toBe(true);
-    expect(preview.changes.some((change) => change.after.terrain === "water")).toBe(
+    expect(preview.cardChanges.some((change) => change.after.terrain === "water")).toBe(
       false,
     );
-    expect(preview.changes.length).toBeGreaterThan(0);
+    expect(preview.cardChanges.length).toBeGreaterThan(0);
   });
 });
 

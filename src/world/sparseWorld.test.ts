@@ -166,7 +166,7 @@ describe("boundary helpers", () => {
 });
 
 describe("world migration", () => {
-  it("migrates version 1 rectangular saves to version 2", () => {
+  it("migrates version 1 rectangular saves to version 3", () => {
     const legacy: LegacyWorldStateV1 = {
       version: 1,
       id: "legacy-id",
@@ -222,7 +222,10 @@ describe("world migration", () => {
 
     const migrated = parseWorld(JSON.stringify(legacy));
 
-    expect(migrated.version).toBe(2);
+    expect(migrated.version).toBe(4);
+    expect(migrated.turn).toBe(1);
+    expect(migrated.settlementRegions).toBeDefined();
+    expect(migrated.travelRoutes).toEqual({});
     expect(migrated.tiles["0,0"]?.terrain).toBe("grassland");
     expect(migrated.tiles["1,1"]?.terrain).toBe("forest");
     expect(migrated.tiles["0,0"]?.tags).toEqual([]);

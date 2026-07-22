@@ -2,6 +2,7 @@ import { getTileId, parseTileId } from "../world/coordinates";
 import type { WorldState } from "../world/worldTypes";
 import {
   createEmptySelection,
+  getRouteEndpointTileIds,
   type SelectionMode,
   type SelectionState,
 } from "./selectionTypes";
@@ -74,6 +75,8 @@ export function handleTileSelection(
         ...current,
         tileIds: [tileId],
         rectangleAnchorId: null,
+        routeOriginTileId: null,
+        routeDestinationTileId: null,
       };
 
     case "adjacent": {
@@ -136,6 +139,44 @@ export function handleTileSelection(
       };
     }
 
+    case "two-endpoints": {
+      if (!current.routeOriginTileId) {
+        return {
+          ...current,
+          routeOriginTileId: tileId,
+          routeDestinationTileId: null,
+          tileIds: [tileId],
+        };
+      }
+
+      if (!current.routeDestinationTileId) {
+        if (current.routeOriginTileId === tileId) {
+          return current;
+        }
+
+        return {
+          ...current,
+          routeDestinationTileId: tileId,
+          tileIds: [current.routeOriginTileId, tileId],
+        };
+      }
+
+      if (tileId === current.routeOriginTileId) {
+        return {
+          ...current,
+          routeOriginTileId: tileId,
+          routeDestinationTileId: null,
+          tileIds: [tileId],
+        };
+      }
+
+      return {
+        ...current,
+        routeDestinationTileId: tileId,
+        tileIds: [current.routeOriginTileId, tileId],
+      };
+    }
+
     default:
       return current;
   }
@@ -144,13 +185,49 @@ export function handleTileSelection(
 export function getPrimarySelectedTileId(
   selection: SelectionState,
 ): string | null {
+  if (selection.mode === "two-endpoints") {
+    return selection.routeOriginTileId;
+  }
+
   return selection.tileIds[0] ?? null;
+}
+
+export function getSecondarySelectedTileId(
+  selection: SelectionState,
+): string | null {
+  if (selection.mode === "two-endpoints") {
+    return selection.routeDestinationTileId;
+  }
+
+  return selection.tileIds[1] ?? null;
 }
 
 export function formatSelection(
   world: WorldState,
   selection: SelectionState,
 ): string {
+  if (selection.mode === "two-endpoints") {
+    if (!selection.routeOriginTileId) {
+      return "Select a route origin.";
+    }
+
+    if (!selection.routeDestinationTileId) {
+      const origin = world.tiles[selection.routeOriginTileId];
+      return origin
+        ? `Origin: ${origin.x}, ${origin.y}. Select a destination.`
+        : "Select a route destination.";
+    }
+
+    const origin = world.tiles[selection.routeOriginTileId];
+    const destination = world.tiles[selection.routeDestinationTileId];
+
+    if (!origin || !destination) {
+      return "Route endpoints selected.";
+    }
+
+    return `Route: ${origin.x},${origin.y} → ${destination.x},${destination.y}`;
+  }
+
   if (selection.tileIds.length === 0) {
     if (selection.mode === "rectangle" && selection.rectangleAnchorId) {
       return "Rectangle: choose the opposite corner";
@@ -182,5 +259,9 @@ export function getSelectionModeLabel(mode: SelectionMode): string {
       return "Adjacent tiles";
     case "rectangle":
       return "Rectangle";
+    case "two-endpoints":
+      return "Route endpoints";
   }
 }
+
+export { getRouteEndpointTileIds };
