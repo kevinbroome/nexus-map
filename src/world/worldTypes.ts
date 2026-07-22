@@ -6,15 +6,21 @@ export type TerrainType =
   | "mountain"
   | "urban";
 
+export type SettlementType = "village" | "town" | "city";
+
+export interface Settlement {
+  type: SettlementType;
+  name?: string;
+}
+
 export interface MapTile {
   id: string;
   x: number;
   y: number;
   terrain: TerrainType;
-  settlement?: {
-    type: "village" | "town" | "city";
-    name?: string;
-  };
+  settlement?: Settlement;
+  tags: string[];
+  properties: Record<string, string | number | boolean>;
 }
 
 export interface TileChange {
@@ -31,6 +37,8 @@ export interface WorldAction {
   targetIds: string[];
   appliedAt: string;
   changes: TileChange[];
+  randomSeed: string;
+  resolvedValues: Record<string, unknown>;
 }
 
 export interface WorldState {

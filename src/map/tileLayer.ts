@@ -2,6 +2,11 @@ import L from "leaflet";
 import type { MapTile } from "../world/worldTypes";
 import { TILE_SIZE } from "./mapConfig";
 
+export type TileHighlightState = {
+  selected: ReadonlySet<string>;
+  preview: ReadonlySet<string>;
+};
+
 export function getTerrainColour(terrain: MapTile["terrain"]): string {
   switch (terrain) {
     case "water":
@@ -21,7 +26,7 @@ export function getTerrainColour(terrain: MapTile["terrain"]): string {
 
 export function createTileLayer(
   tile: MapTile,
-  selectedTileIds: ReadonlySet<string>,
+  highlights: TileHighlightState,
   onSelect: (tileId: string) => void,
 ): L.Rectangle {
   const bounds = L.latLngBounds(
@@ -29,13 +34,27 @@ export function createTileLayer(
     [(tile.y + 1) * TILE_SIZE, (tile.x + 1) * TILE_SIZE],
   );
 
-  const isSelected = selectedTileIds.has(tile.id);
+  const isSelected = highlights.selected.has(tile.id);
+  const isPreview = highlights.preview.has(tile.id);
+
+  let borderColor = "#555";
+  let borderWeight = 1;
+
+  if (isPreview) {
+    borderColor = "#2563eb";
+    borderWeight = 3;
+  }
+
+  if (isSelected) {
+    borderColor = "#c2410c";
+    borderWeight = 3;
+  }
 
   const layer = L.rectangle(bounds, {
-    color: isSelected ? "#c2410c" : "#555",
-    weight: isSelected ? 3 : 1,
+    color: borderColor,
+    weight: borderWeight,
     fillColor: getTerrainColour(tile.terrain),
-    fillOpacity: 1,
+    fillOpacity: isPreview ? 0.85 : 1,
   });
 
   if (tile.settlement) {

@@ -5,6 +5,7 @@ import {
   type WorldAction,
   type WorldState,
 } from "../world/worldTypes";
+import { normalizeMapTile, normalizeWorldAction } from "../world/tileUtils";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -19,7 +20,9 @@ function isMapTile(value: unknown): value is MapTile {
     typeof value.id === "string" &&
     typeof value.x === "number" &&
     typeof value.y === "number" &&
-    typeof value.terrain === "string"
+    typeof value.terrain === "string" &&
+    (value.tags === undefined || Array.isArray(value.tags)) &&
+    (value.properties === undefined || isRecord(value.properties))
   );
 }
 
@@ -61,6 +64,22 @@ function validateHistorySequence(history: WorldAction[]): void {
       throw new Error("The saved world contains an invalid action sequence.");
     }
   }
+}
+
+function normalizeLoadedWorld(data: WorldState): WorldState {
+  const tiles = Object.fromEntries(
+    Object.entries(data.tiles).map(([tileId, tile]) => [
+      tileId,
+      normalizeMapTile(tile),
+    ]),
+  );
+  const history = data.history.map((action) => normalizeWorldAction(action));
+
+  return {
+    ...data,
+    tiles,
+    history,
+  };
 }
 
 export function parseWorld(json: string): WorldState {
@@ -111,7 +130,7 @@ export function parseWorld(json: string): WorldState {
 
   validateHistorySequence(data.history as WorldAction[]);
 
-  return data as unknown as WorldState;
+  return normalizeLoadedWorld(data as unknown as WorldState);
 }
 
 export function serializeWorld(world: WorldState): string {

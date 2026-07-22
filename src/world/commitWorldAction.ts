@@ -1,10 +1,14 @@
-import { validateCardApplication } from "../cards/validateCard";
 import type { CardDefinition } from "../cards/cardTypes";
-import { proposeCardChanges } from "../cards/applyCard";
+import {
+  formatProposalMessage,
+  proposeAction,
+  proposalsAreEqual,
+} from "../rules/engine";
 import { saveWorld } from "../persistence/worldStorage";
-import type { TileChange, WorldAction, WorldState } from "./worldTypes";
+import type { WorldAction, WorldState } from "./worldTypes";
+import { cloneTile } from "./tileUtils";
 
-function cloneTile<T>(value: T): T {
+function cloneValue<T>(value: T): T {
   return structuredClone(value);
 }
 
@@ -18,12 +22,11 @@ function getNextSequence(world: WorldState): number {
 
 function buildUpdatedWorld(
   world: WorldState,
-  changes: TileChange[],
   action: WorldAction,
 ): WorldState {
   const tiles = { ...world.tiles };
 
-  for (const change of changes) {
+  for (const change of action.changes) {
     tiles[change.tileId] = cloneTile(change.after);
   }
 
@@ -53,29 +56,43 @@ export function formatCommitMessage(action: WorldAction): string {
 export function commitWorldAction(
   world: WorldState,
   card: CardDefinition,
-  targetIds: string[],
+  selectionTileIds: string[],
+  randomSeed?: string,
+  expectedProposal?: ReturnType<typeof proposeAction>,
 ): CommitResult {
-  const validation = validateCardApplication(world, card, targetIds);
+  const proposal = proposeAction(
+    world,
+    card,
+    selectionTileIds,
+    randomSeed,
+  );
 
-  if (!validation.valid) {
-    throw new Error(validation.message);
+  if (!proposal.valid) {
+    throw new Error(formatProposalMessage(proposal));
   }
 
-  const changes = proposeCardChanges(world, card, targetIds);
+  if (expectedProposal && !proposalsAreEqual(proposal, expectedProposal)) {
+    throw new Error(
+      "The preview no longer matches the current world. Select the card again.",
+    );
+  }
+
   const action: WorldAction = {
     id: crypto.randomUUID(),
     sequence: getNextSequence(world),
     cardId: card.id,
     cardName: card.name,
-    targetIds: [...targetIds],
+    targetIds: [...proposal.targetIds],
     appliedAt: new Date().toISOString(),
-    changes: changes.map((change) => ({
+    changes: proposal.changes.map((change) => ({
       tileId: change.tileId,
-      before: cloneTile(change.before),
-      after: cloneTile(change.after),
+      before: cloneValue(change.before),
+      after: cloneValue(change.after),
     })),
+    randomSeed: proposal.randomSeed,
+    resolvedValues: cloneValue(proposal.resolvedValues),
   };
-  const updatedWorld = buildUpdatedWorld(world, changes, action);
+  const updatedWorld = buildUpdatedWorld(world, action);
 
   try {
     saveWorld(updatedWorld);

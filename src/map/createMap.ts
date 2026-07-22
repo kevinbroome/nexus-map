@@ -7,7 +7,7 @@ import {
   WORLD_PIXEL_HEIGHT,
   WORLD_PIXEL_WIDTH,
 } from "./mapConfig";
-import { createTileLayer } from "./tileLayer";
+import { createTileLayer, type TileHighlightState } from "./tileLayer";
 
 export type WorldMapView = {
   map: L.Map;
@@ -17,7 +17,7 @@ export type WorldMapView = {
 export function createWorldMap(
   containerId: string,
   world: WorldState,
-  selectedTileIds: ReadonlySet<string>,
+  highlights: TileHighlightState,
   onSelect: (tileId: string) => void,
 ): WorldMapView {
   const map = L.map(containerId, {
@@ -37,7 +37,7 @@ export function createWorldMap(
 
   const tileLayerGroup = L.layerGroup().addTo(map);
 
-  renderWorldTiles(tileLayerGroup, world, selectedTileIds, onSelect);
+  renderWorldTiles(tileLayerGroup, world, highlights, onSelect);
 
   return { map, tileLayerGroup };
 }
@@ -45,7 +45,7 @@ export function createWorldMap(
 export function renderWorldTiles(
   tileLayerGroup: L.LayerGroup,
   world: WorldState,
-  selectedTileIds: ReadonlySet<string>,
+  highlights: TileHighlightState,
   onSelect: (tileId: string) => void,
 ): void {
   tileLayerGroup.clearLayers();
@@ -58,7 +58,7 @@ export function renderWorldTiles(
         continue;
       }
 
-      createTileLayer(tile, selectedTileIds, onSelect).addTo(tileLayerGroup);
+      createTileLayer(tile, highlights, onSelect).addTo(tileLayerGroup);
     }
   }
 }

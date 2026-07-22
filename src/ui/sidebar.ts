@@ -1,13 +1,15 @@
-import type { CardDefinition } from "../cards/cardTypes";
+import type { CardDefinition, ProposedAction } from "../cards/cardTypes";
 import type { WorldState } from "../world/worldTypes";
 import type { SelectionState } from "../selection/selectionTypes";
 import { getLatestActionSequence } from "../world/commitWorldAction";
 import { formatSelection } from "../selection/selection";
+import { formatProposalMessage } from "../rules/engine";
 
 export type AppState = {
   world: WorldState | null;
   selection: SelectionState;
   drawnCard: CardDefinition | null;
+  proposedAction: ProposedAction | null;
   statusMessage: string;
   loadError: string | null;
 };
@@ -91,10 +93,12 @@ export function getSidebarElements(): SidebarElements {
 export function renderSidebar(
   elements: SidebarElements,
   state: AppState,
-  validationMessage: string,
-  canApply: boolean,
 ): void {
   const interactionsDisabled = state.world === null;
+  const proposalMessage = state.proposedAction
+    ? formatProposalMessage(state.proposedAction)
+    : "";
+  const canApply = state.proposedAction?.valid ?? false;
 
   elements.selectedLocation.textContent = state.world
     ? formatSelection(state.world, state.selection)
@@ -115,7 +119,7 @@ export function renderSidebar(
     elements.cardPanel.hidden = false;
     elements.cardName.textContent = state.drawnCard.name;
     elements.cardDescription.textContent = state.drawnCard.description;
-    elements.cardValidation.textContent = validationMessage;
+    elements.cardValidation.textContent = proposalMessage;
     elements.cardValidation.dataset.valid = canApply ? "true" : "false";
     elements.applyCardButton.disabled = !canApply;
   } else {

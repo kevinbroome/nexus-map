@@ -1,4 +1,5 @@
-import { CURRENT_WORLD_VERSION, type MapTile, type WorldState } from "./worldTypes";
+import { type MapTile, type WorldState } from "./worldTypes";
+import { normalizeMapTile } from "./tileUtils";
 
 export function createTileId(x: number, y: number): string {
   return `${x},${y}`;
@@ -15,12 +16,19 @@ export function createWorld(
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const id = createTileId(x, y);
-      tiles[id] = { id, x, y, terrain: "empty" };
+      tiles[id] = normalizeMapTile({
+        id,
+        x,
+        y,
+        terrain: "empty",
+        tags: [],
+        properties: {},
+      });
     }
   }
 
   return {
-    version: CURRENT_WORLD_VERSION,
+    version: 1,
     id: crypto.randomUUID(),
     name,
     width,

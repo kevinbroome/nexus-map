@@ -2,18 +2,23 @@ import "leaflet/dist/leaflet.css";
 import "./style.css";
 
 import { drawRandomCard } from "./cards/drawCard";
-import { validateCardApplication } from "./cards/validateCard";
 import {
   createWorldMap,
   getDefaultWorldDimensions,
   renderWorldTiles,
   type WorldMapView,
 } from "./map/createMap";
+import type { TileHighlightState } from "./map/tileLayer";
 import {
   clearSavedWorld,
   loadWorld,
   saveWorld,
 } from "./persistence/worldStorage";
+import {
+  getPreviewTileIds,
+  proposeAction,
+} from "./rules/engine";
+import { createRandomSeed } from "./rules/random";
 import {
   handleTileSelection,
   setSelectionMode,
@@ -86,25 +91,32 @@ function createInitialState(startup: StartupResult): AppState {
     world: startup.world,
     selection: createEmptySelection("single"),
     drawnCard: null,
+    proposedAction: null,
     statusMessage: startup.statusMessage,
     loadError: startup.loadError,
   };
 }
 
-function getValidation(state: AppState) {
+function buildProposal(state: AppState) {
   if (!state.drawnCard || !state.world) {
-    return { valid: false, message: "" };
+    return null;
   }
 
-  return validateCardApplication(
+  return proposeAction(
     state.world,
     state.drawnCard,
     state.selection.tileIds,
+    state.proposedAction?.randomSeed ?? createRandomSeed(),
   );
 }
 
-function getSelectedTileIds(state: AppState): ReadonlySet<string> {
-  return new Set(state.selection.tileIds);
+function getTileHighlights(state: AppState): TileHighlightState {
+  return {
+    selected: new Set(state.selection.tileIds),
+    preview: new Set(
+      state.proposedAction ? getPreviewTileIds(state.proposedAction) : [],
+    ),
+  };
 }
 
 function bootstrap(): void {
@@ -117,7 +129,7 @@ function bootstrap(): void {
     worldMap = createWorldMap(
       "map",
       world,
-      getSelectedTileIds(state),
+      getTileHighlights(state),
       (tileId) => {
         if (!state.world) {
           return;
@@ -126,7 +138,9 @@ function bootstrap(): void {
         state = {
           ...state,
           selection: handleTileSelection(state.world, state.selection, tileId),
+          proposedAction: null,
         };
+        state.proposedAction = buildProposal(state);
         refresh();
       },
     );
@@ -137,13 +151,11 @@ function bootstrap(): void {
   }
 
   function refresh(): void {
-    const validation = getValidation(state);
-
     if (worldMap && state.world) {
       renderWorldTiles(
         worldMap.tileLayerGroup,
         state.world,
-        getSelectedTileIds(state),
+        getTileHighlights(state),
         (tileId) => {
           if (!state.world) {
             return;
@@ -152,13 +164,15 @@ function bootstrap(): void {
           state = {
             ...state,
             selection: handleTileSelection(state.world, state.selection, tileId),
+            proposedAction: null,
           };
+          state.proposedAction = buildProposal(state);
           refresh();
         },
       );
     }
 
-    renderSidebar(sidebar, state, validation.message, validation.valid);
+    renderSidebar(sidebar, state);
   }
 
   sidebar.createNewWorldButton.addEventListener("click", () => {
@@ -173,6 +187,7 @@ function bootstrap(): void {
         world,
         selection: createEmptySelection("single"),
         drawnCard: null,
+        proposedAction: null,
         statusMessage: "New world created and saved.",
         loadError: null,
       };
@@ -202,8 +217,10 @@ function bootstrap(): void {
           state.selection,
           input.value as SelectionMode,
         ),
+        proposedAction: null,
         statusMessage: `Selection mode: ${input.labels?.[0]?.textContent?.trim() ?? input.value}.`,
       };
+      state.proposedAction = buildProposal(state);
       refresh();
     });
   }
@@ -217,13 +234,15 @@ function bootstrap(): void {
     state = {
       ...state,
       drawnCard,
+      proposedAction: null,
       statusMessage: `Drew "${drawnCard.name}".`,
     };
+    state.proposedAction = buildProposal(state);
     refresh();
   });
 
   sidebar.applyCardButton.addEventListener("click", () => {
-    if (!state.drawnCard || !state.world) {
+    if (!state.drawnCard || !state.world || !state.proposedAction) {
       return;
     }
 
@@ -232,12 +251,15 @@ function bootstrap(): void {
         state.world,
         state.drawnCard,
         state.selection.tileIds,
+        state.proposedAction.randomSeed,
+        state.proposedAction,
       );
 
       state = {
         ...state,
         world: result.world,
         drawnCard: null,
+        proposedAction: null,
         statusMessage: result.message,
         loadError: null,
       };
@@ -261,6 +283,7 @@ function bootstrap(): void {
     state = {
       ...state,
       drawnCard: null,
+      proposedAction: null,
       statusMessage: `Discarded "${discardedName}".`,
     };
     refresh();
