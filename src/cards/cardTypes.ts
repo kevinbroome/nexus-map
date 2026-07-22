@@ -3,6 +3,7 @@ import type {
   RouteChange,
   TravelNodeType,
 } from "../networks/networkTypes";
+import type { TargetResolutionRecord, TargetResolutionResult } from "../rules/targeting/types";
 import type {
   SettlementRegionChange,
   TerrainType,
@@ -10,15 +11,6 @@ import type {
   WorldConsequence,
   WorldState,
 } from "../world/worldTypes";
-
-export type TargetDefinition =
-  | { type: "single-tile" }
-  | { type: "adjacent-tiles"; radius: number }
-  | { type: "connected-region"; terrain?: TerrainType }
-  | { type: "rectangle"; maxWidth: number; maxHeight: number }
-  | { type: "settlement" }
-  | { type: "global" }
-  | { type: "two-endpoints"; allowedNodeTypes: TravelNodeType[] };
 
 export type ConditionDefinition =
   | { type: "terrain-is"; terrain: TerrainType }
@@ -47,7 +39,12 @@ export type EffectDefinition =
         | { type: "nearest-valid-settlement" }
         | { type: "random-valid-settlement" };
       preferExistingNetwork?: boolean;
+      allowedNodeTypes?: TravelNodeType[];
     };
+
+export type { TargetDefinition } from "../rules/targeting/types";
+
+import type { TargetDefinition } from "../rules/targeting/types";
 
 export interface CardDefinition {
   id: string;
@@ -69,6 +66,7 @@ export interface ProposedAction {
   routeChanges: RouteChange[];
   consequences: WorldConsequence[];
   proposedRoutes: ProposedTravelRoute[];
+  targetResolution: TargetResolutionResult | null;
   nextTurn: number;
   resultingWorld: WorldState | null;
   randomSeed: string;
@@ -80,6 +78,7 @@ export function createInvalidProposal(
   targetIds: string[],
   validationMessages: string[],
   randomSeed: string,
+  targetResolution: TargetResolutionResult | null = null,
 ): ProposedAction {
   return {
     cardId,
@@ -92,13 +91,26 @@ export function createInvalidProposal(
     routeChanges: [],
     consequences: [],
     proposedRoutes: [],
+    targetResolution,
     nextTurn: 0,
     resultingWorld: null,
     randomSeed,
-    resolvedValues: {},
+    resolvedValues: targetResolution?.resolvedValues ?? {},
   };
 }
 
 export function cardRequiresTwoEndpoints(card: CardDefinition): boolean {
-  return card.target.type === "two-endpoints";
+  return card.target.destination !== undefined;
+}
+
+export function toTargetResolutionRecord(
+  result: TargetResolutionResult,
+): TargetResolutionRecord {
+  return {
+    originIds: result.originIds,
+    destinationIds: result.destinationIds,
+    selectedIds: result.selectedIds,
+    expandedTargetIds: result.expandedTargetIds,
+    resolvedValues: result.resolvedValues,
+  };
 }

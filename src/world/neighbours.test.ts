@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { adjacentPrimaryTarget } from "../cards/cardTargets";
+import type { CardDefinition } from "../cards/cardTypes";
 import { resolveCardTargets } from "../rules/targets";
 import { getPreviewTileIds, proposeAction } from "../rules/engine";
 import { cards } from "../cards/cardDefinitions";
@@ -332,16 +334,21 @@ describe("adjacent card targeting compatibility", () => {
       1,
       "cardinal",
     ).map((tile) => tile.id);
-    const cardTargets = resolveCardTargets(
-      world,
-      { type: "adjacent-tiles", radius: 1 },
-      ["0,0"],
-    );
+    const card: CardDefinition = {
+      id: "adjacent-test",
+      name: "Adjacent Test",
+      description: "Test",
+      target: adjacentPrimaryTarget(1),
+      conditions: [],
+      effects: [{ type: "set-terrain", terrain: "forest" }],
+    };
+    const cardTargets = resolveCardTargets(world, card, ["0,0"]);
 
-    expect(cardTargets).toEqual({
-      ok: true,
-      targetIds: graphTargets,
-    });
+    expect(cardTargets.ok).toBe(true);
+
+    if (cardTargets.ok) {
+      expect(cardTargets.targetIds.sort()).toEqual(graphTargets.sort());
+    }
     expect(graphTargets.sort()).toEqual(["0,0", "0,1", "1,0"].sort());
     expect(graphTargets).not.toContain(getTileId(-1, 0));
   });

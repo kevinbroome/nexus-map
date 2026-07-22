@@ -1,9 +1,12 @@
 import type { CardDefinition } from "../cards/cardTypes";
+import { toTargetResolutionRecord } from "../cards/cardTypes";
 import {
   formatProposalMessage,
+  getTargetResolutionRecord,
   proposeAction,
   proposalsAreEqual,
 } from "../rules/engine";
+import type { TargetResolutionRecord } from "../rules/targeting/types";
 import type { SelectionState } from "../selection/selectionTypes";
 import { saveWorld } from "../persistence/worldStorage";
 import { formatConsequencesSummary } from "../worldLaws/consequenceMessages";
@@ -19,6 +22,13 @@ export function getLatestActionSequence(world: WorldState): number {
 
 function getNextSequence(world: WorldState): number {
   return getLatestActionSequence(world) + 1;
+}
+
+function targetResolutionRecordsMatch(
+  left: TargetResolutionRecord,
+  right: TargetResolutionRecord,
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 export type CommitResult = {
@@ -69,6 +79,21 @@ export function commitWorldAction(
     );
   }
 
+  const expectedRecord = expectedProposal
+    ? getTargetResolutionRecord(expectedProposal)
+    : null;
+  const commitRecord = getTargetResolutionRecord(proposal);
+
+  if (
+    expectedRecord &&
+    commitRecord &&
+    !targetResolutionRecordsMatch(expectedRecord, commitRecord)
+  ) {
+    throw new Error(
+      "Target resolution changed between preview and commit. Select the card again.",
+    );
+  }
+
   const allChanges = [...proposal.cardChanges, ...proposal.consequenceChanges].map(
     (change) => ({
       tileId: change.tileId,
@@ -77,12 +102,25 @@ export function commitWorldAction(
     }),
   );
 
+  const targetResolution = commitRecord
+    ? cloneValue(commitRecord)
+    : proposal.targetResolution
+      ? toTargetResolutionRecord(proposal.targetResolution)
+      : {
+          originIds: [],
+          destinationIds: [],
+          selectedIds: [],
+          expandedTargetIds: [...proposal.targetIds],
+          resolvedValues: cloneValue(proposal.resolvedValues),
+        };
+
   const action: WorldAction = {
     id: crypto.randomUUID(),
     sequence: getNextSequence(world),
     cardId: card.id,
     cardName: card.name,
     targetIds: [...proposal.targetIds],
+    targetResolution,
     appliedAt: new Date().toISOString(),
     changes: allChanges,
     randomSeed: proposal.randomSeed,

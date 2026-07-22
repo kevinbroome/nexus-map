@@ -14,6 +14,7 @@ import {
   getPrimarySelectedTileId,
 } from "../selection/selection";
 import { formatProposalMessage } from "../rules/engine";
+import { describeResolvedTargets } from "../rules/targeting/describe";
 import { findRegionForTileAtTier } from "../worldLaws/settlementHierarchy";
 import { findRuinClusterForTile } from "../worldLaws/ruinClusters";
 import { cards } from "../cards/cardDefinitions";
@@ -61,6 +62,7 @@ export type SidebarElements = {
   devInspectionSettlement: HTMLParagraphElement;
   devInspectionSettlementDetail: HTMLPreElement;
   devInspectionRouteDetail: HTMLPreElement;
+  devInspectionTargeting: HTMLPreElement;
 };
 
 export function getSidebarElements(): SidebarElements {
@@ -121,6 +123,9 @@ export function getSidebarElements(): SidebarElements {
   const devInspectionRouteDetail = document.querySelector<HTMLPreElement>(
     "#dev-inspection-route-detail",
   );
+  const devInspectionTargeting = document.querySelector<HTMLPreElement>(
+    "#dev-inspection-targeting",
+  );
 
   if (
     !selectedLocation ||
@@ -148,7 +153,8 @@ export function getSidebarElements(): SidebarElements {
     !devInspectionRegion ||
     !devInspectionSettlement ||
     !devInspectionSettlementDetail ||
-    !devInspectionRouteDetail
+    !devInspectionRouteDetail ||
+    !devInspectionTargeting
   ) {
     throw new Error("Sidebar elements are missing from the page.");
   }
@@ -180,6 +186,7 @@ export function getSidebarElements(): SidebarElements {
     devInspectionSettlement,
     devInspectionSettlementDetail,
     devInspectionRouteDetail,
+    devInspectionTargeting,
   };
 }
 
@@ -281,6 +288,30 @@ function formatTileRouteInspection(world: WorldState, tileId: string): string {
   ].join("\n");
 }
 
+function formatTargetingInspection(
+  proposal: ProposedAction | null,
+): string {
+  if (!proposal?.targetResolution) {
+    return "";
+  }
+
+  const lines = [
+    ...describeResolvedTargets(proposal.targetResolution),
+    `Random seed: ${proposal.randomSeed}`,
+  ];
+
+  const resolvedEntries = Object.entries(proposal.targetResolution.resolvedValues);
+
+  if (resolvedEntries.length > 0) {
+    lines.push(
+      "Resolved values:",
+      ...resolvedEntries.map(([key, value]) => `${key}: ${JSON.stringify(value)}`),
+    );
+  }
+
+  return lines.join("\n");
+}
+
 export function renderSidebar(
   elements: SidebarElements,
   state: AppState,
@@ -356,6 +387,9 @@ export function renderSidebar(
     ]
       .filter(Boolean)
       .join("\n\n");
+    elements.devInspectionTargeting.textContent = formatTargetingInspection(
+      state.proposedAction,
+    );
   } else {
     elements.devInspectionCardinal.textContent = "Cardinal neighbours: —";
     elements.devInspectionAll.textContent = "All neighbours: —";
@@ -365,6 +399,9 @@ export function renderSidebar(
     elements.devInspectionRouteDetail.textContent = state.world && state.selectedRouteId
       ? formatRouteInspection(state.world, state.selectedRouteId)
       : "";
+    elements.devInspectionTargeting.textContent = formatTargetingInspection(
+      state.proposedAction,
+    );
   }
 
   for (const input of elements.selectionModeInputs) {

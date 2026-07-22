@@ -1,5 +1,5 @@
 import type { CardDefinition, ProposedAction } from "../cards/cardTypes";
-import { createInvalidProposal } from "../cards/cardTypes";
+import { createInvalidProposal, toTargetResolutionRecord } from "../cards/cardTypes";
 import type { SelectionState } from "../selection/selectionTypes";
 import {
   EndpointResolutionError,
@@ -19,6 +19,7 @@ import { formatConsequencePreviewMessages } from "../worldLaws/consequenceMessag
 import { evaluateConditions } from "./conditions";
 import { applyEffectsToTile } from "./effects";
 import { createRandomSeed } from "./random";
+import { getRouteEndpointTileIds } from "./targeting/resolveTargets";
 import { resolveCardTargets } from "./targets";
 
 function buildTileChanges(
@@ -78,20 +79,7 @@ function resolveRouteProposal(
     };
   }
 
-  if (routeEffect.destination.type !== "selected-secondary-target") {
-    return {
-      ok: false as const,
-      messages: [
-        `Destination strategy "${routeEffect.destination.type}" is not implemented yet.`,
-      ],
-    };
-  }
-
-  const allowedNodeTypes =
-    card.target.type === "two-endpoints"
-      ? card.target.allowedNodeTypes
-      : (["tile"] as const);
-
+  const allowedNodeTypes = routeEffect.allowedNodeTypes ?? (["tile"] as const);
   const origin = inferEndpointFromTile(world, originTileId, [...allowedNodeTypes]);
   const destination = inferEndpointFromTile(
     world,
@@ -148,39 +136,57 @@ export function proposeAction(
   randomSeed: string = createRandomSeed(),
   selection?: SelectionState,
 ): ProposedAction {
+  const previousAction = world.history.at(-1);
   const targetResolution = resolveCardTargets(
     world,
-    card.target,
+    card,
     selectionTileIds,
     selection,
+    randomSeed,
+    previousAction,
   );
 
-  if (!targetResolution.ok) {
+  if (!targetResolution.ok || !targetResolution.result) {
     return createInvalidProposal(
       card.id,
       [],
-      targetResolution.messages,
+      targetResolution.ok ? ["Target resolution failed."] : targetResolution.messages,
       randomSeed,
+      targetResolution.result,
     );
   }
 
+  const resolution = targetResolution.result;
   const targetIds = targetResolution.targetIds;
   const validationMessages: string[] = [];
   const modifiedTiles: Record<string, MapTile> = {};
-  const resolvedValues: Record<string, unknown> = {};
+  const resolvedValues: Record<string, unknown> = {
+    ...resolution.resolvedValues,
+  };
   const routeEffect = getCreateTravelRouteEffect(card.effects);
   const nextTurn = world.turn + 1;
 
   let proposedRoutes: ProposedAction["proposedRoutes"] = [];
   let routeChanges: ProposedAction["routeChanges"] = [];
 
-  if (routeEffect && card.target.type === "two-endpoints") {
-    const [originTileId, destinationTileId] = targetIds;
+  if (routeEffect) {
+    const [originTileId, destinationTileId] = getRouteEndpointTileIds(resolution);
+
+    if (!originTileId || !destinationTileId) {
+      return createInvalidProposal(
+        card.id,
+        targetIds,
+        ["Route endpoints could not be resolved."],
+        randomSeed,
+        resolution,
+      );
+    }
+
     const routeResult = resolveRouteProposal(
       world,
       card,
-      originTileId!,
-      destinationTileId!,
+      originTileId,
+      destinationTileId,
       nextTurn,
     );
 
@@ -190,6 +196,7 @@ export function proposeAction(
         targetIds,
         routeResult.messages,
         randomSeed,
+        resolution,
       );
     }
 
@@ -209,7 +216,11 @@ export function proposeAction(
     );
   }
 
-  for (const tileId of targetIds) {
+  const effectTargetIds = routeEffect
+    ? resolution.expandedTargetIds
+    : targetIds;
+
+  for (const tileId of effectTargetIds) {
     const tile = world.tiles[tileId];
 
     if (!tile) {
@@ -279,6 +290,7 @@ export function proposeAction(
         ? validationMessages
         : ["No valid targets were found for this card."],
       randomSeed,
+      resolution,
     );
   }
 
@@ -303,6 +315,7 @@ export function proposeAction(
     routeChanges,
     consequences: lawResult.consequences,
     proposedRoutes,
+    targetResolution: resolution,
     nextTurn,
     resultingWorld,
     randomSeed,
@@ -311,6 +324,10 @@ export function proposeAction(
 }
 
 export function getPreviewTileIds(proposal: ProposedAction): string[] {
+  if (proposal.targetResolution?.expandedTargetIds.length) {
+    return proposal.targetResolution.expandedTargetIds;
+  }
+
   if (proposal.cardChanges.length > 0) {
     return proposal.cardChanges.map((change) => change.tileId);
   }
@@ -349,4 +366,10 @@ export function getAllPreviewTileIds(proposal: ProposedAction): string[] {
 
 export function getRoutePreviewPath(proposal: ProposedAction): string[] {
   return proposal.proposedRoutes[0]?.pathTileIds ?? [];
+}
+
+export function getTargetResolutionRecord(proposal: ProposedAction) {
+  return proposal.targetResolution
+    ? toTargetResolutionRecord(proposal.targetResolution)
+    : null;
 }

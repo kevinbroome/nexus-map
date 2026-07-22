@@ -10,6 +10,7 @@ import {
   type WorldAction,
   type WorldState,
 } from "../world/worldTypes";
+import type { TargetResolutionRecord } from "../rules/targeting/types";
 import { buildSettlementHierarchy } from "../worldLaws/settlementHierarchy";
 import { normalizeMapTile, normalizeWorldAction } from "../world/tileUtils";
 
@@ -71,10 +72,28 @@ function isLegacyWorldAction(value: unknown): value is WorldAction {
   );
 }
 
+function isTargetResolutionRecord(value: unknown): value is TargetResolutionRecord {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    Array.isArray(value.originIds) &&
+    Array.isArray(value.destinationIds) &&
+    Array.isArray(value.selectedIds) &&
+    Array.isArray(value.expandedTargetIds) &&
+    isRecord(value.resolvedValues)
+  );
+}
+
 function isWorldAction(value: unknown): value is WorldAction {
   if (!isRecord(value)) {
     return false;
   }
+
+  const hasTargetResolution =
+    value.targetResolution === undefined ||
+    isTargetResolutionRecord(value.targetResolution);
 
   return (
     typeof value.id === "string" &&
@@ -90,7 +109,8 @@ function isWorldAction(value: unknown): value is WorldAction {
     typeof value.turn === "number" &&
     Array.isArray(value.consequences) &&
     Array.isArray(value.regionChanges) &&
-    Array.isArray(value.routeChanges)
+    Array.isArray(value.routeChanges) &&
+    hasTargetResolution
   );
 }
 

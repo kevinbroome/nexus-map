@@ -1,6 +1,19 @@
 import L from "leaflet";
 import type { MapTile } from "../world/worldTypes";
+import {
+  TARGET_HIGHLIGHT_STYLES,
+  type TargetHighlightRole,
+} from "./targetHighlightStyles";
 import { TILE_SIZE } from "./mapConfig";
+
+export type TargetingHighlightState = {
+  showPipeline: boolean;
+  origin: ReadonlySet<string>;
+  candidates: ReadonlySet<string>;
+  filteredOut: ReadonlySet<string>;
+  selected: ReadonlySet<string>;
+  expanded: ReadonlySet<string>;
+};
 
 export type TileHighlightState = {
   selected: ReadonlySet<string>;
@@ -8,7 +21,94 @@ export type TileHighlightState = {
   consequencePreview: ReadonlySet<string>;
   routeOrigin: ReadonlySet<string>;
   routeDestination: ReadonlySet<string>;
+  targeting?: TargetingHighlightState;
 };
+
+type ResolvedHighlight = {
+  borderColor: string;
+  borderWeight: number;
+  fillOpacity: number;
+};
+
+function styleForRole(role: TargetHighlightRole): ResolvedHighlight {
+  const style = TARGET_HIGHLIGHT_STYLES[role];
+
+  return {
+    borderColor: style.borderColor,
+    borderWeight: style.borderWeight,
+    fillOpacity: "fillOpacity" in style ? style.fillOpacity : 1,
+  };
+}
+
+function resolveTileHighlight(
+  tileId: string,
+  highlights: TileHighlightState,
+): ResolvedHighlight {
+  const targeting = highlights.targeting;
+
+  if (targeting) {
+    if (highlights.routeDestination.has(tileId)) {
+      return styleForRole("secondarySelection");
+    }
+
+    if (highlights.routeOrigin.has(tileId)) {
+      return styleForRole("primarySelection");
+    }
+
+    if (targeting.showPipeline && targeting.filteredOut.has(tileId)) {
+      return styleForRole("filteredOut");
+    }
+
+    if (targeting.expanded.has(tileId)) {
+      return styleForRole("expanded");
+    }
+
+    if (targeting.selected.has(tileId)) {
+      return styleForRole("selected");
+    }
+
+    if (targeting.showPipeline && targeting.candidates.has(tileId)) {
+      return styleForRole("candidate");
+    }
+
+    if (targeting.origin.has(tileId)) {
+      return styleForRole("origin");
+    }
+  }
+
+  let borderColor = "#555";
+  let borderWeight = 1;
+  let fillOpacity = 1;
+
+  if (highlights.consequencePreview.has(tileId) && !highlights.preview.has(tileId)) {
+    borderColor = "#7c3aed";
+    borderWeight = 2;
+    fillOpacity = 0.9;
+  }
+
+  if (highlights.preview.has(tileId)) {
+    borderColor = TARGET_HIGHLIGHT_STYLES.expanded.borderColor;
+    borderWeight = TARGET_HIGHLIGHT_STYLES.expanded.borderWeight;
+    fillOpacity = TARGET_HIGHLIGHT_STYLES.expanded.fillOpacity;
+  }
+
+  if (highlights.routeDestination.has(tileId)) {
+    borderColor = TARGET_HIGHLIGHT_STYLES.destination.borderColor;
+    borderWeight = TARGET_HIGHLIGHT_STYLES.destination.borderWeight;
+  }
+
+  if (highlights.routeOrigin.has(tileId)) {
+    borderColor = TARGET_HIGHLIGHT_STYLES.origin.borderColor;
+    borderWeight = TARGET_HIGHLIGHT_STYLES.origin.borderWeight;
+  }
+
+  if (highlights.selected.has(tileId)) {
+    borderColor = TARGET_HIGHLIGHT_STYLES.selected.borderColor;
+    borderWeight = TARGET_HIGHLIGHT_STYLES.selected.borderWeight;
+  }
+
+  return { borderColor, borderWeight, fillOpacity };
+}
 
 export function getTerrainColour(terrain: MapTile["terrain"]): string {
   switch (terrain) {
@@ -41,48 +141,16 @@ export function createTileLayer(
     [(tile.y + 1) * TILE_SIZE, (tile.x + 1) * TILE_SIZE],
   );
 
-  const isSelected = highlights.selected.has(tile.id);
-  const isPreview = highlights.preview.has(tile.id);
-  const isConsequencePreview = highlights.consequencePreview.has(tile.id);
-  const isRouteOrigin = highlights.routeOrigin.has(tile.id);
-  const isRouteDestination = highlights.routeDestination.has(tile.id);
-
-  let borderColor = "#555";
-  let borderWeight = 1;
-  let fillOpacity = 1;
-
-  if (isConsequencePreview && !isPreview) {
-    borderColor = "#7c3aed";
-    borderWeight = 2;
-    fillOpacity = 0.9;
-  }
-
-  if (isPreview) {
-    borderColor = "#2563eb";
-    borderWeight = 3;
-    fillOpacity = 0.85;
-  }
-
-  if (isRouteDestination) {
-    borderColor = "#15803d";
-    borderWeight = 3;
-  }
-
-  if (isRouteOrigin) {
-    borderColor = "#b45309";
-    borderWeight = 3;
-  }
-
-  if (isSelected) {
-    borderColor = "#c2410c";
-    borderWeight = 3;
-  }
+  const { borderColor, borderWeight, fillOpacity } = resolveTileHighlight(
+    tile.id,
+    highlights,
+  );
 
   const layer = L.rectangle(bounds, {
     color: borderColor,
     weight: borderWeight,
     fillColor: getTerrainColour(tile.terrain),
-    fillOpacity: fillOpacity,
+    fillOpacity,
   });
 
   if (tile.settlement) {

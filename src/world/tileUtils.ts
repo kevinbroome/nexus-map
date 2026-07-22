@@ -1,5 +1,6 @@
 import type { MapTile, Settlement, WorldAction } from "./worldTypes";
 import { isRuinSettlement, isVillageSettlement } from "./worldTypes";
+import type { TargetResolutionRecord } from "../rules/targeting/types";
 
 export function cloneTile(tile: MapTile): MapTile {
   return structuredClone(tile);
@@ -48,11 +49,25 @@ export function normalizeMapTile(tile: MapTile): MapTile {
   };
 }
 
+function createEmptyTargetResolutionRecord(): TargetResolutionRecord {
+  return {
+    originIds: [],
+    destinationIds: [],
+    selectedIds: [],
+    expandedTargetIds: [],
+    resolvedValues: {},
+  };
+}
+
 export function normalizeWorldAction(action: WorldAction): WorldAction {
   return {
     ...action,
     randomSeed: action.randomSeed ?? "",
     resolvedValues: action.resolvedValues ?? {},
+    targetResolution: action.targetResolution ?? {
+      ...createEmptyTargetResolutionRecord(),
+      expandedTargetIds: [...action.targetIds],
+    },
     turn: action.turn ?? 0,
     consequences: action.consequences ?? [],
     regionChanges: action.regionChanges ?? [],

@@ -32,6 +32,16 @@ export function commitTileCreation(
     cardId: "dev-create-tile",
     cardName: "Create tile",
     targetIds: [tileId],
+    targetResolution: {
+      originIds: [tileId],
+      destinationIds: [],
+      selectedIds: [tileId],
+      expandedTargetIds: [tileId],
+      resolvedValues: {
+        coordinate,
+        terrain,
+      },
+    },
     appliedAt: new Date().toISOString(),
     changes: [
       {

@@ -1,165 +1,66 @@
-import type { TargetDefinition } from "../cards/cardTypes";
+import type { CardDefinition } from "../cards/cardTypes";
 import type { SelectionState } from "../selection/selectionTypes";
-import {
-  getConnectedRegion,
-  getExistingTilesWithinGraphSteps,
-  matchesTerrain,
-} from "../world/neighbours";
 import type { WorldState } from "../world/worldTypes";
+import type { TargetResolutionContext } from "./targeting/types";
+import { resolveTargets, getEffectTargetIds } from "./targeting/resolveTargets";
 
 export type TargetResolution =
-  | { ok: true; targetIds: string[] }
-  | { ok: false; messages: string[] };
+  | { ok: true; targetIds: string[]; result: import("./targeting/types").TargetResolutionResult }
+  | { ok: false; messages: string[]; result: import("./targeting/types").TargetResolutionResult | null };
+
+export function buildTargetResolutionContext(
+  world: WorldState,
+  card: CardDefinition,
+  selection?: SelectionState,
+  randomSeed = "",
+  previousAction?: import("../world/worldTypes").WorldAction,
+  selectionTileIds: string[] = [],
+): TargetResolutionContext {
+  return {
+    world,
+    card,
+    primarySelectionId:
+      selection?.routeOriginTileId ??
+      selection?.tileIds[0] ??
+      selectionTileIds[0],
+    secondarySelectionId:
+      selection?.routeDestinationTileId ??
+      selection?.tileIds[1] ??
+      selectionTileIds[1],
+    previousAction,
+    randomSeed,
+  };
+}
 
 export function resolveCardTargets(
   world: WorldState,
-  target: TargetDefinition,
+  card: CardDefinition,
   selectionTileIds: string[],
   selection?: SelectionState,
+  randomSeed = "",
+  previousAction?: import("../world/worldTypes").WorldAction,
 ): TargetResolution {
-  switch (target.type) {
-    case "single-tile": {
-      if (selectionTileIds.length === 0) {
-        return { ok: false, messages: ["Select a tile first."] };
-      }
+  const context = buildTargetResolutionContext(
+    world,
+    card,
+    selection,
+    randomSeed,
+    previousAction,
+    selectionTileIds,
+  );
+  const result = resolveTargets(card.target, context);
 
-      if (selectionTileIds.length > 1) {
-        return {
-          ok: false,
-          messages: ["This card requires exactly one selected tile."],
-        };
-      }
-
-      const tileId = selectionTileIds[0]!;
-
-      if (!world.tiles[tileId]) {
-        return { ok: false, messages: ["Selected tile does not exist."] };
-      }
-
-      return { ok: true, targetIds: [tileId] };
-    }
-
-    case "adjacent-tiles": {
-      if (selectionTileIds.length === 0) {
-        return { ok: false, messages: ["Select a tile first."] };
-      }
-
-      if (selectionTileIds.length > 1) {
-        return {
-          ok: false,
-          messages: ["This card requires exactly one anchor tile."],
-        };
-      }
-
-      const anchorId = selectionTileIds[0]!;
-      const anchor = world.tiles[anchorId];
-
-      if (!anchor) {
-        return { ok: false, messages: ["Selected tile does not exist."] };
-      }
-
-      const targetTiles = getExistingTilesWithinGraphSteps(
-        world,
-        anchorId,
-        target.radius,
-        "cardinal",
-      );
-
-      return {
-        ok: true,
-        targetIds: targetTiles.map((tile) => tile.id),
-      };
-    }
-
-    case "connected-region": {
-      if (selectionTileIds.length === 0) {
-        return { ok: false, messages: ["Select a tile first."] };
-      }
-
-      if (selectionTileIds.length > 1) {
-        return {
-          ok: false,
-          messages: ["This card requires exactly one anchor tile."],
-        };
-      }
-
-      const anchorId = selectionTileIds[0]!;
-      const anchor = world.tiles[anchorId];
-
-      if (!anchor) {
-        return { ok: false, messages: ["Selected tile does not exist."] };
-      }
-
-      const terrain = target.terrain ?? anchor.terrain;
-      const region = getConnectedRegion(
-        world,
-        anchorId,
-        matchesTerrain(terrain),
-        "cardinal",
-      );
-
-      if (region.length === 0) {
-        return {
-          ok: false,
-          messages: [
-            `No connected ${terrain} region starts at the selected tile.`,
-          ],
-        };
-      }
-
-      return {
-        ok: true,
-        targetIds: region.map((tile) => tile.id),
-      };
-    }
-
-    case "two-endpoints": {
-      const originId = selection?.routeOriginTileId;
-      const destinationId = selection?.routeDestinationTileId;
-
-      if (!originId) {
-        return { ok: false, messages: ["Select a route origin."] };
-      }
-
-      if (!destinationId) {
-        return { ok: false, messages: ["Select a route destination."] };
-      }
-
-      if (!world.tiles[originId]) {
-        return { ok: false, messages: ["Route origin tile does not exist."] };
-      }
-
-      if (!world.tiles[destinationId]) {
-        return {
-          ok: false,
-          messages: ["Route destination tile does not exist."],
-        };
-      }
-
-      if (originId === destinationId) {
-        return {
-          ok: false,
-          messages: ["Route origin and destination must differ."],
-        };
-      }
-
-      return { ok: true, targetIds: [originId, destinationId] };
-    }
-
-    case "rectangle":
-    case "settlement":
-    case "global":
-      return {
-        ok: false,
-        messages: [`Target type "${target.type}" is not implemented yet.`],
-      };
-
-    default: {
-      const unreachable: never = target;
-      return {
-        ok: false,
-        messages: [`Unsupported target type: ${String(unreachable)}`],
-      };
-    }
+  if (!result.valid) {
+    return {
+      ok: false,
+      messages: result.validationMessages,
+      result,
+    };
   }
+
+  return {
+    ok: true,
+    targetIds: getEffectTargetIds(result, card.target),
+    result,
+  };
 }

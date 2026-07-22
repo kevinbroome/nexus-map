@@ -140,6 +140,14 @@ function getTileHighlights(state: AppState): TileHighlightState {
     routeDestination.add(state.selection.routeDestinationTileId);
   }
 
+  const resolution = state.proposedAction?.targetResolution;
+  const showPipeline = import.meta.env.DEV;
+  const candidateIds = resolution?.candidateIds ?? [];
+  const filteredIds = resolution?.filteredCandidateIds ?? [];
+  const filteredOut = showPipeline
+    ? candidateIds.filter((tileId) => !filteredIds.includes(tileId))
+    : [];
+
   return {
     selected: new Set(state.selection.tileIds),
     preview: new Set(
@@ -152,6 +160,16 @@ function getTileHighlights(state: AppState): TileHighlightState {
     ),
     routeOrigin,
     routeDestination,
+    targeting: resolution
+      ? {
+          showPipeline,
+          origin: new Set(resolution.originIds),
+          candidates: new Set(showPipeline ? candidateIds : []),
+          filteredOut: new Set(filteredOut),
+          selected: new Set(resolution.selectedIds),
+          expanded: new Set(resolution.expandedTargetIds),
+        }
+      : undefined,
   };
 }
 
