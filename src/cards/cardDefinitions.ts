@@ -2,27 +2,33 @@ import type { CardDefinition } from "./cardTypes";
 
 export const cards: CardDefinition[] = [
   {
-    id: "create-water",
+    id: "waters-rise",
     name: "The Waters Rise",
-    description: "Turn the selected tile into water.",
+    description: "Turn the selected location into water.",
     targetType: "tile",
-    action: "set-terrain",
-    value: "water",
+    action: {
+      type: "set-terrain",
+      terrain: "water",
+    },
   },
   {
-    id: "create-forest",
+    id: "wild-growth",
     name: "The Wild Returns",
-    description: "Turn the selected tile into forest.",
+    description: "Turn the selected location into forest.",
     targetType: "tile",
-    action: "set-terrain",
-    value: "forest",
+    action: {
+      type: "set-terrain",
+      terrain: "forest",
+    },
   },
   {
-    id: "found-village",
+    id: "new-foundations",
     name: "New Foundations",
-    description: "Create a village on valid land.",
+    description: "Create a village on the selected land tile.",
     targetType: "tile",
-    action: "add-settlement",
-    value: "village",
+    action: {
+      type: "add-settlement",
+      settlementType: "village",
+    },
   },
 ];

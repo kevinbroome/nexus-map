@@ -13,8 +13,51 @@
     <main id="app">
       <aside id="sidebar">
         <h1>Nexus Map</h1>
-        <button id="draw-card" type="button">Draw card</button>
         <p id="selected-location">No location selected</p>
+        <p id="status-message"></p>
+
+        <section id="recovery-panel" hidden>
+          <p id="recovery-message">
+            The saved world could not be loaded. You can replace it with a fresh
+            world. This cannot be undone.
+          </p>
+          <button id="create-new-world" type="button">Create new world</button>
+        </section>
+
+        <fieldset id="selection-modes">
+          <legend>Selection mode</legend>
+          <label>
+            <input
+              type="radio"
+              name="selection-mode"
+              value="single"
+              checked
+            />
+            Single tile
+          </label>
+          <label>
+            <input type="radio" name="selection-mode" value="adjacent" />
+            Adjacent tiles
+          </label>
+          <label>
+            <input type="radio" name="selection-mode" value="rectangle" />
+            Rectangle
+          </label>
+        </fieldset>
+
+        <div class="sidebar-actions">
+          <button id="draw-card" type="button">Draw card</button>
+        </div>
+
+        <section id="card-panel" hidden>
+          <h2 id="card-name"></h2>
+          <p id="card-description"></p>
+          <p id="card-validation"></p>
+          <div class="card-actions">
+            <button id="apply-card" type="button" disabled>Apply</button>
+            <button id="discard-card" type="button">Discard</button>
+          </div>
+        </section>
       </aside>
 
       <div id="map"></div>
