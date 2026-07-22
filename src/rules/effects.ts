@@ -181,6 +181,9 @@ export function applyEffectToTile(
     case "create-travel-route":
       return updatedTile;
 
+    case "propagate":
+      return updatedTile;
+
     default: {
 
       const unreachable: never = effect;

@@ -10,6 +10,18 @@ import {
   singlePrimaryTileTarget,
   twoEndpointRouteTarget,
 } from "./cardTargets";
+import {
+  ashWalkEffect,
+  ashWalkTarget,
+  creepingWildsIIEffect,
+  creepingWildsIITarget,
+  marchOfTheChasmEffect,
+  marchOfTheChasmTarget,
+  theFloodComesEffect,
+  theFloodComesTarget,
+  theOldRoadHoldsEffect,
+  theOldRoadHoldsTarget,
+} from "./cardPropagations";
 
 export const cards: CardDefinition[] = [
   {
@@ -140,5 +152,50 @@ export const cards: CardDefinition[] = [
     target: ringOfAshTarget(),
     conditions: [],
     effects: [{ type: "add-tag", tag: "ash" }],
+  },
+  {
+    id: "creeping-wilds-ii",
+    name: "Creeping Wilds II",
+    description:
+      "Spread forest outward from wild terrain, avoiding mountains and urban resistance.",
+    target: creepingWildsIITarget(),
+    conditions: [
+      { type: "terrain-is-not", terrain: "water" },
+      { type: "terrain-is-not", terrain: "chasm" },
+    ],
+    effects: [creepingWildsIIEffect()],
+  },
+  {
+    id: "the-flood-comes",
+    name: "The Flood Comes",
+    description: "Spread water outward, creating new shoreline tiles when needed.",
+    target: theFloodComesTarget(),
+    conditions: [{ type: "terrain-is", terrain: "water" }],
+    effects: [theFloodComesEffect()],
+  },
+  {
+    id: "march-of-the-chasm",
+    name: "March of the Chasm",
+    description:
+      "Carve a chasm in a random cardinal direction, pushing through resistance.",
+    target: marchOfTheChasmTarget(),
+    conditions: [],
+    effects: [marchOfTheChasmEffect()],
+  },
+  {
+    id: "the-old-road-holds",
+    name: "The Old Road Holds",
+    description: "Mark tiles along the connected road network as protected.",
+    target: theOldRoadHoldsTarget(),
+    conditions: [],
+    effects: [theOldRoadHoldsEffect()],
+  },
+  {
+    id: "ash-walk",
+    name: "Ash Walk",
+    description: "Leave an ash trail by random walk, stopping before water or chasms.",
+    target: ashWalkTarget(),
+    conditions: [],
+    effects: [ashWalkEffect()],
   },
 ];

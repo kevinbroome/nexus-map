@@ -14,6 +14,10 @@ import {
   getPrimarySelectedTileId,
 } from "../selection/selection";
 import { formatProposalMessage } from "../rules/engine";
+import {
+  describePropagationDefinition,
+  describePropagationResult,
+} from "../rules/propagation/describe";
 import { describeResolvedTargets } from "../rules/targeting/describe";
 import { findRegionForTileAtTier } from "../worldLaws/settlementHierarchy";
 import { findRuinClusterForTile } from "../worldLaws/ruinClusters";
@@ -63,6 +67,7 @@ export type SidebarElements = {
   devInspectionSettlementDetail: HTMLPreElement;
   devInspectionRouteDetail: HTMLPreElement;
   devInspectionTargeting: HTMLPreElement;
+  devInspectionPropagation: HTMLPreElement;
 };
 
 export function getSidebarElements(): SidebarElements {
@@ -126,6 +131,9 @@ export function getSidebarElements(): SidebarElements {
   const devInspectionTargeting = document.querySelector<HTMLPreElement>(
     "#dev-inspection-targeting",
   );
+  const devInspectionPropagation = document.querySelector<HTMLPreElement>(
+    "#dev-inspection-propagation",
+  );
 
   if (
     !selectedLocation ||
@@ -154,7 +162,8 @@ export function getSidebarElements(): SidebarElements {
     !devInspectionSettlement ||
     !devInspectionSettlementDetail ||
     !devInspectionRouteDetail ||
-    !devInspectionTargeting
+    !devInspectionTargeting ||
+    !devInspectionPropagation
   ) {
     throw new Error("Sidebar elements are missing from the page.");
   }
@@ -187,6 +196,7 @@ export function getSidebarElements(): SidebarElements {
     devInspectionSettlementDetail,
     devInspectionRouteDetail,
     devInspectionTargeting,
+    devInspectionPropagation,
   };
 }
 
@@ -312,6 +322,75 @@ function formatTargetingInspection(
   return lines.join("\n");
 }
 
+function formatPropagationInspection(
+  proposal: ProposedAction | null,
+): string {
+  if (!proposal || proposal.propagationResults.length === 0) {
+    return "";
+  }
+
+  const lines: string[] = [];
+
+  proposal.propagationResults.forEach((result, index) => {
+    const effect = proposal.cardId
+      ? cards.find((card) => card.id === proposal.cardId)?.effects[index]
+      : undefined;
+
+    if (effect?.type === "propagate") {
+      lines.push(`Strategy:\n${describePropagationDefinition(effect)}`);
+    }
+
+    lines.push(
+      `Magnitude:\n${result.resolvedValues["propagation.magnitude"] ?? "—"} affected tiles`,
+    );
+
+    if (result.seedTileIds[0]) {
+      lines.push(`Seed:\n${result.seedTileIds[0]}`);
+    }
+
+    result.steps.forEach((step) => {
+      const label = `${step.toCoordinate.x},${step.toCoordinate.y}`;
+      const status = step.applied
+        ? "Applied"
+        : step.skippedReason ?? "Skipped";
+
+      lines.push(
+        `Step ${step.sequence + 1}:\n${label}\nCost ${step.traversalCost}\n${status}`,
+      );
+    });
+
+    if (result.createdTileIds.length > 0) {
+      lines.push(`Created tiles:\n${result.createdTileIds.join(", ")}`);
+    }
+
+    const replacementSkips = result.steps
+      .filter((step) => !step.applied && step.skippedReason?.includes("priority"))
+      .map(
+        (step) =>
+          `Replacement skip at ${step.toCoordinate.x},${step.toCoordinate.y}: ${step.skippedReason}`,
+      );
+
+    if (replacementSkips.length > 0) {
+      lines.push(`Replacement skips:\n${replacementSkips.join("\n")}`);
+    }
+
+    lines.push(...describePropagationResult(result));
+
+    const resolvedEntries = Object.entries(result.resolvedValues);
+
+    if (resolvedEntries.length > 0) {
+      lines.push(
+        "Resolved values:",
+        ...resolvedEntries.map(([key, value]) => `${key}: ${JSON.stringify(value)}`),
+      );
+    }
+  });
+
+  lines.push(`Random seed: ${proposal.randomSeed}`);
+
+  return lines.join("\n\n");
+}
+
 export function renderSidebar(
   elements: SidebarElements,
   state: AppState,
@@ -390,6 +469,9 @@ export function renderSidebar(
     elements.devInspectionTargeting.textContent = formatTargetingInspection(
       state.proposedAction,
     );
+    elements.devInspectionPropagation.textContent = formatPropagationInspection(
+      state.proposedAction,
+    );
   } else {
     elements.devInspectionCardinal.textContent = "Cardinal neighbours: —";
     elements.devInspectionAll.textContent = "All neighbours: —";
@@ -400,6 +482,9 @@ export function renderSidebar(
       ? formatRouteInspection(state.world, state.selectedRouteId)
       : "";
     elements.devInspectionTargeting.textContent = formatTargetingInspection(
+      state.proposedAction,
+    );
+    elements.devInspectionPropagation.textContent = formatPropagationInspection(
       state.proposedAction,
     );
   }

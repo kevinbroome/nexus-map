@@ -107,6 +107,7 @@ export interface SettlementRegionChange {
 export type { RouteChange, TravelRoute } from "../networks/networkTypes";
 import type { RouteChange } from "../networks/networkTypes";
 
+import type { PropagationRecord } from "../rules/propagation/types";
 import type { TargetResolutionRecord } from "../rules/targeting/types";
 
 export interface WorldAction {
@@ -116,6 +117,7 @@ export interface WorldAction {
   cardName: string;
   targetIds: string[];
   targetResolution: TargetResolutionRecord;
+  propagationRecords: PropagationRecord[];
   appliedAt: string;
   changes: TileChange[];
   randomSeed: string;

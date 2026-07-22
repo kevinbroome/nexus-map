@@ -4,7 +4,20 @@ import {
   TARGET_HIGHLIGHT_STYLES,
   type TargetHighlightRole,
 } from "./targetHighlightStyles";
+import {
+  PROPAGATION_HIGHLIGHT_STYLES,
+  type PropagationHighlightRole,
+} from "./propagationHighlightStyles";
 import { TILE_SIZE } from "./mapConfig";
+
+export type PropagationHighlightState = {
+  showFullPath: boolean;
+  seed: ReadonlySet<string>;
+  affected: ReadonlySet<string>;
+  created: ReadonlySet<string>;
+  traversed: ReadonlySet<string>;
+  blocked: ReadonlySet<string>;
+};
 
 export type TargetingHighlightState = {
   showPipeline: boolean;
@@ -22,6 +35,7 @@ export type TileHighlightState = {
   routeOrigin: ReadonlySet<string>;
   routeDestination: ReadonlySet<string>;
   targeting?: TargetingHighlightState;
+  propagation?: PropagationHighlightState;
 };
 
 type ResolvedHighlight = {
@@ -40,10 +54,59 @@ function styleForRole(role: TargetHighlightRole): ResolvedHighlight {
   };
 }
 
+function styleForPropagationRole(
+  role: PropagationHighlightRole,
+): ResolvedHighlight {
+  const style = PROPAGATION_HIGHLIGHT_STYLES[role];
+
+  return {
+    borderColor: style.borderColor,
+    borderWeight: style.borderWeight,
+    fillOpacity: style.fillOpacity,
+  };
+}
+
+function resolvePropagationHighlight(
+  tileId: string,
+  propagation: PropagationHighlightState,
+): ResolvedHighlight | null {
+  if (propagation.blocked.has(tileId)) {
+    return styleForPropagationRole("blocked");
+  }
+
+  if (propagation.created.has(tileId)) {
+    return styleForPropagationRole("created");
+  }
+
+  if (propagation.affected.has(tileId)) {
+    return styleForPropagationRole("affected");
+  }
+
+  if (propagation.seed.has(tileId)) {
+    return styleForPropagationRole("seed");
+  }
+
+  if (propagation.showFullPath && propagation.traversed.has(tileId)) {
+    return styleForPropagationRole("traversed");
+  }
+
+  return null;
+}
+
 function resolveTileHighlight(
   tileId: string,
   highlights: TileHighlightState,
 ): ResolvedHighlight {
+  const propagation = highlights.propagation;
+
+  if (propagation) {
+    const propagationStyle = resolvePropagationHighlight(tileId, propagation);
+
+    if (propagationStyle) {
+      return propagationStyle;
+    }
+  }
+
   const targeting = highlights.targeting;
 
   if (targeting) {

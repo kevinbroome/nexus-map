@@ -1,5 +1,5 @@
 import type { CardDefinition, ProposedAction } from "../cards/cardTypes";
-import { createInvalidProposal, toTargetResolutionRecord } from "../cards/cardTypes";
+import { createInvalidProposal, toPropagationRecord, toTargetResolutionRecord } from "../cards/cardTypes";
 import type { SelectionState } from "../selection/selectionTypes";
 import {
   EndpointResolutionError,
@@ -18,6 +18,11 @@ import { applyWorldLaws } from "../worldLaws/applyWorldLaws";
 import { formatConsequencePreviewMessages } from "../worldLaws/consequenceMessages";
 import { evaluateConditions } from "./conditions";
 import { applyEffectsToTile } from "./effects";
+import {
+  getPropagatingEffects,
+  propagateEffect,
+} from "./propagation/propagate";
+import { describePropagationResult } from "./propagation/describe";
 import { createRandomSeed } from "./random";
 import { getRouteEndpointTileIds } from "./targeting/resolveTargets";
 import { resolveCardTargets } from "./targets";
@@ -25,19 +30,20 @@ import { resolveCardTargets } from "./targets";
 function buildTileChanges(
   world: WorldState,
   modifiedTiles: Record<string, MapTile>,
+  explicitChanges: TileChange[] = [],
 ): TileChange[] {
-  const changes: TileChange[] = [];
+  const changes = [...explicitChanges];
 
   for (const [tileId, after] of Object.entries(modifiedTiles)) {
     const before = world.tiles[tileId];
 
-    if (!before) {
+    if (before && JSON.stringify(before) === JSON.stringify(after)) {
       continue;
     }
 
     changes.push({
       tileId,
-      before: cloneTile(before),
+      before: before ? cloneTile(before) : null,
       after: cloneTile(after),
     });
   }
@@ -61,6 +67,12 @@ function applyCardChanges(
     ...world,
     tiles,
   };
+}
+
+function isDirectEffect(
+  effect: CardDefinition["effects"][number],
+): boolean {
+  return effect.type !== "create-travel-route" && effect.type !== "propagate";
 }
 
 function resolveRouteProposal(
@@ -219,12 +231,79 @@ export function proposeAction(
   const effectTargetIds = routeEffect
     ? resolution.expandedTargetIds
     : targetIds;
+  const propagationEffects = getPropagatingEffects(card.effects);
+  const propagationResults: ProposedAction["propagationResults"] = [];
+  const propagationChanges: TileChange[] = [];
+
+  if (propagationEffects.length > 0) {
+    const seedTileIds = resolution.expandedTargetIds.filter((tileId) => {
+      const tile = world.tiles[tileId];
+
+      if (!tile) {
+        validationMessages.push(`Propagation seed "${tileId}" does not exist.`);
+        return false;
+      }
+
+      const conditionResult = evaluateConditions(world, tile, card.conditions);
+
+      if (!conditionResult.valid) {
+        validationMessages.push(...conditionResult.messages);
+        return false;
+      }
+
+      return true;
+    });
+
+    card.effects.forEach((effect, effectIndex) => {
+      if (effect.type !== "propagate") {
+        return;
+      }
+
+      const result = propagateEffect(effect, {
+        world,
+        card,
+        seedTileIds,
+        randomSeed,
+        resolvedTargetValues: resolvedValues,
+        previousAction,
+        effectIndex,
+      });
+
+      propagationResults.push(result);
+      Object.assign(resolvedValues, result.resolvedValues);
+      propagationChanges.push(...result.tileChanges);
+
+      if (!result.valid) {
+        validationMessages.push(...result.validationMessages);
+      } else {
+        validationMessages.push(...describePropagationResult(result));
+      }
+    });
+
+    if (
+      propagationResults.some((result) => !result.valid) ||
+      seedTileIds.length === 0
+    ) {
+      return createInvalidProposal(
+        card.id,
+        targetIds,
+        validationMessages.length > 0
+          ? validationMessages
+          : ["Propagation could not be resolved."],
+        randomSeed,
+        resolution,
+      );
+    }
+  }
 
   for (const tileId of effectTargetIds) {
     const tile = world.tiles[tileId];
 
     if (!tile) {
-      validationMessages.push(`Tile "${tileId}" does not exist.`);
+      if (propagationEffects.length === 0) {
+        validationMessages.push(`Tile "${tileId}" does not exist.`);
+      }
+
       continue;
     }
 
@@ -235,11 +314,9 @@ export function proposeAction(
       continue;
     }
 
-    const nonRouteEffects = card.effects.filter(
-      (effect) => effect.type !== "create-travel-route",
-    );
+    const directEffects = card.effects.filter(isDirectEffect);
 
-    if (nonRouteEffects.length === 0) {
+    if (directEffects.length === 0) {
       continue;
     }
 
@@ -249,7 +326,7 @@ export function proposeAction(
         applyEffectsToTile(
           world,
           tile,
-          nonRouteEffects,
+          directEffects,
           randomSeed,
           resolvedValues,
         ),
@@ -261,7 +338,7 @@ export function proposeAction(
     }
   }
 
-  const cardChanges = buildTileChanges(world, modifiedTiles);
+  const cardChanges = buildTileChanges(world, modifiedTiles, propagationChanges);
   const postCardWorld = applyCardChanges(world, cardChanges);
   const lawResult = applyWorldLaws(world, postCardWorld, nextTurn);
 
@@ -316,6 +393,7 @@ export function proposeAction(
     consequences: lawResult.consequences,
     proposedRoutes,
     targetResolution: resolution,
+    propagationResults,
     nextTurn,
     resultingWorld,
     randomSeed,
@@ -324,6 +402,15 @@ export function proposeAction(
 }
 
 export function getPreviewTileIds(proposal: ProposedAction): string[] {
+  const propagatedIds = proposal.propagationResults.flatMap((result) => [
+    ...result.affectedTileIds,
+    ...result.createdTileIds,
+  ]);
+
+  if (propagatedIds.length > 0) {
+    return [...new Set(propagatedIds)];
+  }
+
   if (proposal.targetResolution?.expandedTargetIds.length) {
     return proposal.targetResolution.expandedTargetIds;
   }
@@ -333,6 +420,68 @@ export function getPreviewTileIds(proposal: ProposedAction): string[] {
   }
 
   return proposal.targetIds;
+}
+
+export function getPropagationPreviewTileIds(
+  proposal: ProposedAction,
+): string[] {
+  return [
+    ...new Set(
+      proposal.propagationResults.flatMap((result) => [
+        ...result.seedTileIds,
+        ...result.affectedTileIds,
+        ...result.createdTileIds,
+      ]),
+    ),
+  ];
+}
+
+export function getPropagationSeedTileIds(proposal: ProposedAction): string[] {
+  return [
+    ...new Set(
+      proposal.propagationResults.flatMap((result) => result.seedTileIds),
+    ),
+  ];
+}
+
+export function getPropagationAffectedTileIds(
+  proposal: ProposedAction,
+): string[] {
+  return [
+    ...new Set(
+      proposal.propagationResults.flatMap((result) => result.affectedTileIds),
+    ),
+  ];
+}
+
+export function getPropagationCreatedTileIds(
+  proposal: ProposedAction,
+): string[] {
+  return [
+    ...new Set(
+      proposal.propagationResults.flatMap((result) => result.createdTileIds),
+    ),
+  ];
+}
+
+export function getPropagationBlockedTileIds(
+  proposal: ProposedAction,
+): string[] {
+  return [
+    ...new Set(
+      proposal.propagationResults.flatMap((result) => result.blockedTileIds),
+    ),
+  ];
+}
+
+export function getPropagationTraversedTileIds(
+  proposal: ProposedAction,
+): string[] {
+  return [
+    ...new Set(
+      proposal.propagationResults.flatMap((result) => result.traversedTileIds),
+    ),
+  ];
 }
 
 export function getConsequencePreviewTileIds(proposal: ProposedAction): string[] {
@@ -358,10 +507,18 @@ export function getAllPreviewTileIds(proposal: ProposedAction): string[] {
   return [
     ...new Set([
       ...getPreviewTileIds(proposal),
+      ...getPropagationPreviewTileIds(proposal),
+      ...getPropagationBlockedTileIds(proposal),
       ...getConsequencePreviewTileIds(proposal),
       ...getRoutePreviewTileIds(proposal),
     ]),
   ];
+}
+
+export function getPropagationRecords(proposal: ProposedAction) {
+  return proposal.propagationResults.map((result, effectIndex) =>
+    toPropagationRecord(result, effectIndex),
+  );
 }
 
 export function getRoutePreviewPath(proposal: ProposedAction): string[] {

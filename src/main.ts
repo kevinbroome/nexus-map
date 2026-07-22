@@ -24,6 +24,11 @@ import {
 import {
   getConsequencePreviewTileIds,
   getPreviewTileIds,
+  getPropagationBlockedTileIds,
+  getPropagationCreatedTileIds,
+  getPropagationAffectedTileIds,
+  getPropagationSeedTileIds,
+  getPropagationTraversedTileIds,
   proposeAction,
 } from "./rules/engine";
 import { createRandomSeed } from "./rules/random";
@@ -142,6 +147,7 @@ function getTileHighlights(state: AppState): TileHighlightState {
 
   const resolution = state.proposedAction?.targetResolution;
   const showPipeline = import.meta.env.DEV;
+  const propagationProposal = state.proposedAction;
   const candidateIds = resolution?.candidateIds ?? [];
   const filteredIds = resolution?.filteredCandidateIds ?? [];
   const filteredOut = showPipeline
@@ -170,7 +176,32 @@ function getTileHighlights(state: AppState): TileHighlightState {
           expanded: new Set(resolution.expandedTargetIds),
         }
       : undefined,
+    propagation:
+      propagationProposal && propagationProposal.propagationResults.length > 0
+        ? {
+            showFullPath: showPipeline,
+            seed: new Set(getPropagationSeedTileIds(propagationProposal)),
+            affected: new Set(getPropagationAffectedTileIds(propagationProposal)),
+            created: new Set(getPropagationCreatedTileIds(propagationProposal)),
+            traversed: new Set(
+              getPropagationTraversedTileIds(propagationProposal),
+            ),
+            blocked: new Set(getPropagationBlockedTileIds(propagationProposal)),
+          }
+        : undefined,
   };
+}
+
+function getDisplayWorld(state: AppState): WorldState | null {
+  if (!state.world) {
+    return null;
+  }
+
+  if (state.proposedAction?.valid && state.proposedAction.resultingWorld) {
+    return state.proposedAction.resultingWorld;
+  }
+
+  return state.world;
 }
 
 function bootstrap(): void {
@@ -218,16 +249,18 @@ function bootstrap(): void {
   }
 
   function refresh(options?: { fitMap?: boolean }): void {
-    if (worldMap && state.world) {
+    const displayWorld = getDisplayWorld(state);
+
+    if (worldMap && displayWorld && state.world) {
       if (options?.fitMap) {
-        fitMapToWorld(worldMap.map, state.world);
+        fitMapToWorld(worldMap.map, displayWorld);
       } else {
-        updateMapBounds(worldMap.map, state.world);
+        updateMapBounds(worldMap.map, displayWorld);
       }
 
       renderWorldMap(
         worldMap,
-        state.world,
+        displayWorld,
         getTileHighlights(state),
         onTileSelect,
         onRouteSelect,

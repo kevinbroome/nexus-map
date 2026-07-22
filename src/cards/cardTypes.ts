@@ -3,7 +3,12 @@ import type {
   RouteChange,
   TravelNodeType,
 } from "../networks/networkTypes";
-import type { TargetResolutionRecord, TargetResolutionResult } from "../rules/targeting/types";
+import type { PropagationRecord, PropagationResult } from "../rules/propagation/types";
+import type { PropagatingEffectDefinition } from "../rules/propagation/types";
+import type {
+  TargetResolutionRecord,
+  TargetResolutionResult,
+} from "../rules/targeting/types";
 import type {
   SettlementRegionChange,
   TerrainType,
@@ -31,6 +36,7 @@ export type EffectDefinition =
       count: number;
     }
   | { type: "add-tag"; tag: string }
+  | PropagatingEffectDefinition
   | {
       type: "create-travel-route";
       routeType: import("../networks/networkTypes").TravelRouteType;
@@ -42,6 +48,7 @@ export type EffectDefinition =
       allowedNodeTypes?: TravelNodeType[];
     };
 
+export type { PropagatingEffectDefinition } from "../rules/propagation/types";
 export type { TargetDefinition } from "../rules/targeting/types";
 
 import type { TargetDefinition } from "../rules/targeting/types";
@@ -67,6 +74,7 @@ export interface ProposedAction {
   consequences: WorldConsequence[];
   proposedRoutes: ProposedTravelRoute[];
   targetResolution: TargetResolutionResult | null;
+  propagationResults: PropagationResult[];
   nextTurn: number;
   resultingWorld: WorldState | null;
   randomSeed: string;
@@ -92,6 +100,7 @@ export function createInvalidProposal(
     consequences: [],
     proposedRoutes: [],
     targetResolution,
+    propagationResults: [],
     nextTurn: 0,
     resultingWorld: null,
     randomSeed,
@@ -111,6 +120,21 @@ export function toTargetResolutionRecord(
     destinationIds: result.destinationIds,
     selectedIds: result.selectedIds,
     expandedTargetIds: result.expandedTargetIds,
+    resolvedValues: result.resolvedValues,
+  };
+}
+
+export function toPropagationRecord(
+  result: PropagationResult,
+  effectIndex: number,
+): PropagationRecord {
+  return {
+    effectIndex,
+    seedTileIds: result.seedTileIds,
+    affectedTileIds: result.affectedTileIds,
+    createdTileIds: result.createdTileIds,
+    blockedTileIds: result.blockedTileIds,
+    steps: result.steps,
     resolvedValues: result.resolvedValues,
   };
 }

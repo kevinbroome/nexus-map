@@ -42,6 +42,7 @@ export function commitTileCreation(
         terrain,
       },
     },
+    propagationRecords: [],
     appliedAt: new Date().toISOString(),
     changes: [
       {

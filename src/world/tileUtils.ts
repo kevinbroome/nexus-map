@@ -68,6 +68,7 @@ export function normalizeWorldAction(action: WorldAction): WorldAction {
       ...createEmptyTargetResolutionRecord(),
       expandedTargetIds: [...action.targetIds],
     },
+    propagationRecords: action.propagationRecords ?? [],
     turn: action.turn ?? 0,
     consequences: action.consequences ?? [],
     regionChanges: action.regionChanges ?? [],
