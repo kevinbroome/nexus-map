@@ -25,7 +25,7 @@ export const theFloodComesEffect = (): PropagatingEffectDefinition => ({
   type: "propagate",
   operation: { type: "set-terrain", terrain: "water" },
   strategy: { type: "weighted-frontier", neighbourMode: "cardinal" },
-  magnitude: { type: "random-range", minimum: 4, maximum: 8 },
+  magnitude: { type: "random-range", minimum: 3, maximum: 6 },
   traversal: {
     terrainCosts: {
       grassland: 1,
@@ -51,6 +51,12 @@ export const theFloodComesEffect = (): PropagatingEffectDefinition => ({
   boundary: {
     type: "create-operation-terrain",
     maximumNewTiles: { type: "fixed", value: 3 },
+  },
+  seedFallback: {
+    terrain: "water",
+    tileCount: 2,
+    validHostTerrains: ["empty", "grassland", "desert"],
+    seedOnly: true,
   },
 });
 
@@ -116,7 +122,8 @@ export const creepingWildsDeckEffect = (): PropagatingEffectDefinition => ({
   type: "propagate",
   operation: { type: "set-terrain", terrain: "forest" },
   strategy: { type: "breadth-first", neighbourMode: "cardinal" },
-  magnitude: { type: "random-range", minimum: 4, maximum: 7 },
+  magnitude: { type: "random-range", minimum: 3, maximum: 5 },
+  includeSeeds: true,
   traversal: {
     preferMatchingTerrain: true,
     matchingTerrainMultiplier: 0.5,
@@ -130,6 +137,17 @@ export const creepingWildsDeckEffect = (): PropagatingEffectDefinition => ({
     terrains: ["empty", "grassland", "desert"],
   },
   boundary: { type: "discard-overflow" },
+  seedFallback: {
+    terrain: "forest",
+    tileCount: 1,
+    validHostTerrains: ["empty", "grassland", "desert"],
+    companionTerrain: {
+      terrain: "grassland",
+      count: 1,
+      validHostTerrains: ["empty", "grassland", "desert"],
+    },
+    seedOnly: true,
+  },
 });
 
 export const stoneRisingEffect = (): PropagatingEffectDefinition => ({
@@ -281,5 +299,64 @@ export const chasmMarchesEffect = (): PropagatingEffectDefinition => ({
   boundary: {
     type: "create-operation-terrain",
     maximumNewTiles: { type: "fixed", value: 2 },
+  },
+});
+
+export const greenThroughStoneEffect = (): PropagatingEffectDefinition => ({
+  type: "propagate",
+  operation: { type: "set-terrain", terrain: "grassland" },
+  strategy: { type: "breadth-first", neighbourMode: "cardinal" },
+  magnitude: { type: "random-range", minimum: 2, maximum: 4 },
+  replacement: {
+    type: "only",
+    terrains: ["empty", "desert"],
+  },
+  boundary: { type: "discard-overflow" },
+  seedFallback: {
+    terrain: "forest",
+    whenMissingTerrain: "forest",
+    tileCount: 1,
+    validHostTerrains: ["empty", "grassland", "desert"],
+    companionTerrain: {
+      terrain: "grassland",
+      count: 2,
+      validHostTerrains: ["empty", "grassland", "desert"],
+    },
+    seedOnly: true,
+  },
+});
+
+export const rainOnBarrenGroundEffect = (): PropagatingEffectDefinition => ({
+  type: "propagate",
+  operation: { type: "set-terrain", terrain: "grassland" },
+  strategy: { type: "breadth-first", neighbourMode: "cardinal" },
+  magnitude: { type: "random-range", minimum: 2, maximum: 4 },
+  includeSeeds: true,
+  replacement: {
+    type: "only",
+    terrains: ["empty", "desert"],
+  },
+  boundary: { type: "discard-overflow" },
+});
+
+export const riverFindsAWayEffect = (): PropagatingEffectDefinition => ({
+  type: "propagate",
+  operation: { type: "set-terrain", terrain: "water" },
+  strategy: {
+    type: "directional",
+    direction: { type: "random-cardinal" },
+    spread: 1,
+  },
+  magnitude: { type: "random-range", minimum: 2, maximum: 4 },
+  replacement: {
+    type: "only",
+    terrains: ["empty", "grassland", "desert", "forest"],
+  },
+  boundary: { type: "discard-overflow" },
+  seedFallback: {
+    terrain: "water",
+    tileCount: 1,
+    validHostTerrains: ["empty", "grassland", "desert"],
+    seedOnly: false,
   },
 });

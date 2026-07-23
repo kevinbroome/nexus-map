@@ -18,7 +18,7 @@ export const FIRST_ADVANCED_TEST_DECK: DeckConfiguration = {
   id: DEFAULT_DECK_CONFIGURATION_ID,
   name: "First Advanced Test Deck",
   description:
-    "Forty-card advanced test deck with twenty-five unique definitions covering creation, growth, connection, transformation, destruction, recovery, expansion, and deck manipulation.",
+    "Rebalanced advanced test deck with reliable forest, water, and settlement seeds, seed fallbacks on spread cards, and opening-draw guarantees.",
   manifest: FIRST_ADVANCED_TEST_DECK_MANIFEST,
 };
 

@@ -1,6 +1,8 @@
-import { getTileId } from "../../world/coordinates";
-import type { TileChange, WorldState } from "../../world/worldTypes";
+import { getExistingTiles, getTileId } from "../../world/coordinates";
+import type { TerrainType, TileChange, WorldState } from "../../world/worldTypes";
 import { cloneTile } from "../../world/tileUtils";
+import { createSeededRandom, pickRandomItems } from "../random";
+import { getWorldCentreTileId } from "../targeting/directions";
 import { resolveNumber } from "../targeting/numbers";
 import { manhattanDistance, sortTileIds } from "../targeting/utils";
 import {
@@ -34,6 +36,75 @@ import type {
   PropagationResult,
   PropagationStep,
 } from "./types";
+import {
+  applySeedFallback,
+  propagationNeedsSeedFallback,
+} from "./seedFallback";
+
+function applyTileChangesToWorld(
+  world: WorldState,
+  changes: TileChange[],
+): WorldState {
+  const tiles = Object.fromEntries(
+    Object.entries(world.tiles).map(([tileId, tile]) => [tileId, cloneTile(tile)]),
+  );
+
+  for (const change of changes) {
+    tiles[change.tileId] = cloneTile(change.after);
+  }
+
+  return { ...world, tiles };
+}
+
+function resolvePropagationSeedTileIds(
+  definition: PropagatingEffectDefinition,
+  context: PropagationContext,
+): string[] {
+  if (definition.operation.type !== "set-terrain") {
+    return context.seedTileIds;
+  }
+
+  const sourceTerrain = definition.operation.terrain;
+  const validSelectedSeeds = context.seedTileIds.filter((tileId) => {
+    const tile = context.world.tiles[tileId];
+
+    if (!tile) {
+      return false;
+    }
+
+    if (tile.terrain === sourceTerrain) {
+      return true;
+    }
+
+    return sourceTerrain === "forest" && tile.terrain === "grassland";
+  });
+
+  if (validSelectedSeeds.length > 0) {
+    return validSelectedSeeds;
+  }
+
+  const terrainTiles = sortTileIds(
+    getExistingTiles(context.world)
+      .filter((tile) => tile.terrain === sourceTerrain)
+      .map((tile) => tile.id),
+  );
+
+  if (terrainTiles.length === 0) {
+    return context.seedTileIds;
+  }
+
+  const random = createSeededRandom(`${context.randomSeed}:propagation-seed`);
+  const [picked] = pickRandomItems(terrainTiles, 1, random);
+  return picked ? [picked] : context.seedTileIds;
+}
+
+function getSourceTerrain(
+  definition: PropagatingEffectDefinition,
+): TerrainType | undefined {
+  return definition.operation.type === "set-terrain"
+    ? definition.operation.terrain
+    : undefined;
+}
 
 function cloneWorldTiles(world: WorldState): WorldState {
   return {
@@ -91,13 +162,67 @@ export function propagateEffect(
     validationMessages.push("Overlay propagation is not supported yet.");
   }
 
-  if (context.seedTileIds.length === 0) {
+  const sourceTerrain = getSourceTerrain(definition);
+  let propagationWorld = context.world;
+  let seedTileIds = sortTileIds(resolvePropagationSeedTileIds(definition, context));
+
+  const needsSeedFallback =
+    definition.seedFallback !== undefined &&
+    (definition.seedFallback.whenMissingTerrain
+      ? propagationNeedsSeedFallback(
+          context.world,
+          definition.seedFallback.whenMissingTerrain,
+        )
+      : sourceTerrain !== undefined &&
+        propagationNeedsSeedFallback(context.world, sourceTerrain));
+
+  if (needsSeedFallback && definition.seedFallback) {
+    const anchorIds =
+      seedTileIds.length > 0
+        ? seedTileIds
+        : [getWorldCentreTileId(context.world)];
+
+    const fallbackResult = applySeedFallback(context.world, definition.seedFallback, {
+      ...context,
+      seedTileIds: anchorIds,
+    });
+
+    Object.assign(resolvedValues, fallbackResult.resolvedValues);
+
+    if (!fallbackResult.valid) {
+      return {
+        ...fallbackResult,
+        resolvedValues: { ...resolvedValues, ...fallbackResult.resolvedValues },
+      };
+    }
+
+    propagationWorld = applyTileChangesToWorld(
+      context.world,
+      fallbackResult.tileChanges,
+    );
+    seedTileIds = sortTileIds(fallbackResult.seedTileIds);
+
+    if (definition.seedFallback.seedOnly) {
+      return {
+        ...fallbackResult,
+        resolvedValues: { ...resolvedValues, ...fallbackResult.resolvedValues },
+      };
+    }
+  }
+
+  const activeContext: PropagationContext = {
+    ...context,
+    world: propagationWorld,
+    seedTileIds,
+  };
+
+  if (seedTileIds.length === 0) {
     validationMessages.push("Propagation requires at least one seed tile.");
   }
 
   const magnitudeResult = resolveNumber(
     definition.magnitude,
-    toTargetResolutionContext(context),
+    toTargetResolutionContext(activeContext),
     "propagation.magnitude",
     { minimum: 1, requirePositive: true },
   );
@@ -108,10 +233,10 @@ export function propagateEffect(
 
   Object.assign(resolvedValues, magnitudeResult.resolvedValues);
 
-  const seedTileId = context.seedTileIds[0];
+  const seedTileId = seedTileIds[0];
   const networkTiles = getNetworkTileSet(
-    context.world,
-    context.seedTileIds,
+    propagationWorld,
+    seedTileIds,
     definition.strategy.type === "follow-network"
       ? definition.strategy.routeType
       : undefined,
@@ -121,7 +246,7 @@ export function propagateEffect(
   if (seedTileId) {
     const directionResult = resolveStrategyDirectionSync(
       definition.strategy,
-      context,
+      activeContext,
       seedTileId,
       resolvedValues,
     );
@@ -136,7 +261,7 @@ export function propagateEffect(
   if (validationMessages.length > 0) {
     return {
       valid: false,
-      seedTileIds: sortTileIds(context.seedTileIds),
+      seedTileIds,
       affectedTileIds: [],
       createdTileIds: [],
       traversedTileIds: [],
@@ -149,8 +274,7 @@ export function propagateEffect(
   }
 
   const magnitude = magnitudeResult.value;
-  const workingWorld = cloneWorldTiles(context.world);
-  const seedTileIds = sortTileIds(context.seedTileIds);
+  const workingWorld = cloneWorldTiles(propagationWorld);
   const primarySeedId = seedTileIds[0]!;
 
   const steps: PropagationStep[] = [];

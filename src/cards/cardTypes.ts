@@ -3,6 +3,7 @@ import type {
   RouteChange,
   TravelNodeType,
 } from "../networks/networkTypes";
+import type { PlayRequirementDefinition } from "./playRequirements";
 import type { DeckCardInstance } from "../deck/deckTypes";
 import type { DeckMutationDefinition, DeckState, ProposedDeckChange } from "../deck/deckTypes";
 import type {
@@ -88,7 +89,11 @@ export type CardTag =
   | "road"
   | "ruin"
   | "boundary"
-  | "rare";
+  | "rare"
+  | "biome-seed"
+  | "water-seed"
+  | "settlement-seed"
+  | "destructive";
 
 export interface CardDefinition {
   id: string;
@@ -103,6 +108,7 @@ export interface CardDefinition {
   conditions: ConditionDefinition[];
   effects: EffectDefinition[];
   initialCopies?: number;
+  playRequirements?: PlayRequirementDefinition[];
   deckMutations?: DeckMutationDefinition[];
   failureBehaviours?: Partial<Record<FailureStage, FailureBehaviourDefinition>>;
   defaultFailureBehaviour?: FailureBehaviourDefinition;

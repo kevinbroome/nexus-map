@@ -1,6 +1,9 @@
 import type { CardDefinition } from "../cards/cardTypes";
+import { autoCentreTileTarget } from "../cards/cardTargets";
 import type { SelectionState } from "../selection/selectionTypes";
 import type { WorldState } from "../world/worldTypes";
+import { getPropagatingEffects } from "./propagation/propagate";
+import { getWorldCentreTileId } from "./targeting/directions";
 import type { TargetResolutionContext } from "./targeting/types";
 import { resolveTargets, getEffectTargetIds } from "./targeting/resolveTargets";
 
@@ -32,6 +35,10 @@ export function buildTargetResolutionContext(
   };
 }
 
+function cardSupportsSeedFallbackTargeting(card: CardDefinition): boolean {
+  return getPropagatingEffects(card.effects).some((effect) => effect.seedFallback);
+}
+
 export function resolveCardTargets(
   world: WorldState,
   card: CardDefinition,
@@ -49,6 +56,30 @@ export function resolveCardTargets(
     selectionTileIds,
   );
   const result = resolveTargets(card.target, context);
+
+  if (!result.valid && cardSupportsSeedFallbackTargeting(card)) {
+    const centreId = getWorldCentreTileId(world);
+    const fallbackTarget = autoCentreTileTarget([]);
+    const fallbackContext: TargetResolutionContext = {
+      ...context,
+      primarySelectionId: centreId,
+    };
+    const fallbackResult = resolveTargets(fallbackTarget, fallbackContext);
+
+    if (fallbackResult.valid) {
+      return {
+        ok: true,
+        targetIds: getEffectTargetIds(fallbackResult, fallbackTarget),
+        result: {
+          ...fallbackResult,
+          resolvedValues: {
+            ...fallbackResult.resolvedValues,
+            seedFallbackTargeting: true,
+          },
+        },
+      };
+    }
+  }
 
   if (!result.valid) {
     return {

@@ -1,5 +1,6 @@
 import type { CardDefinition } from "../cards/cardTypes";
 import type { DeckManifestEntry } from "../cards/advancedDeck/advancedDeckManifest";
+import { evaluatePlayRequirements } from "../cards/playRequirements";
 import { findValidTargetTileIds } from "../rules/failure/autoTarget";
 import { proposeAction } from "../rules/engine";
 import { getWorldCentreTileId } from "../rules/targeting/directions";
@@ -38,6 +39,15 @@ export function checkFreshWorldViability(
 
     if (!definition) {
       warnings.push(`Skipping viability check for missing definition "${entry.definitionId}".`);
+      continue;
+    }
+
+    const playCheck = evaluatePlayRequirements(world, definition.playRequirements);
+
+    if (!playCheck.playable) {
+      if (!temporarilyBlocked.includes(entry.definitionId)) {
+        temporarilyBlocked.push(entry.definitionId);
+      }
       continue;
     }
 

@@ -1,5 +1,6 @@
 import type { CardDefinition, ProposedAction } from "../cards/cardTypes";
 import { createInvalidProposal, toPropagationRecord, toTargetResolutionRecord } from "../cards/cardTypes";
+import { evaluatePlayRequirements } from "../cards/playRequirements";
 import type { SelectionState } from "../selection/selectionTypes";
 import {
   EndpointResolutionError,
@@ -22,6 +23,7 @@ import {
   getPropagatingEffects,
   propagateEffect,
 } from "./propagation/propagate";
+import { propagationNeedsSeedFallback } from "./propagation/seedFallback";
 import { describePropagationResult } from "./propagation/describe";
 import { createRandomSeed } from "./random";
 import { getRouteEndpointTileIds } from "./targeting/resolveTargets";
@@ -152,6 +154,17 @@ export function proposeAction(
   randomSeed: string = createRandomSeed(),
   selection?: SelectionState,
 ): ProposedAction {
+  const playCheck = evaluatePlayRequirements(world, card.playRequirements);
+
+  if (!playCheck.playable) {
+    return createInvalidProposal(
+      card.id,
+      selectionTileIds,
+      playCheck.messages,
+      randomSeed,
+    );
+  }
+
   const previousAction = world.history.at(-1);
   const targetResolution = resolveCardTargets(
     world,
@@ -286,7 +299,18 @@ export function proposeAction(
 
     if (
       propagationResults.some((result) => !result.valid) ||
-      seedTileIds.length === 0
+      (seedTileIds.length === 0 &&
+        !propagationEffects.some(
+          (effect) =>
+            effect.seedFallback &&
+            (effect.seedFallback.whenMissingTerrain
+              ? propagationNeedsSeedFallback(
+                  world,
+                  effect.seedFallback.whenMissingTerrain,
+                )
+              : effect.operation.type === "set-terrain" &&
+                propagationNeedsSeedFallback(world, effect.operation.terrain)),
+        ))
     ) {
       return createInvalidProposal(
         card.id,

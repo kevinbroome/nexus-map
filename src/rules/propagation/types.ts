@@ -123,12 +123,29 @@ export type BoundaryBehaviourDefinition =
       direction: "clockwise" | "counter-clockwise" | "lowest-cost";
     };
 
+export interface SeedFallbackDefinition {
+  terrain: TerrainType;
+  tileCount?: number;
+  anchor?: "near-world-centre" | "primary-selection";
+  validHostTerrains?: TerrainType[];
+  companionTerrain?: {
+    terrain: TerrainType;
+    count: number;
+    validHostTerrains?: TerrainType[];
+  };
+  /** When set, fallback runs if this terrain is absent instead of the operation terrain. */
+  whenMissingTerrain?: TerrainType;
+  /** When true, skip the main spread and only apply the seed tiles. */
+  seedOnly?: boolean;
+}
+
 export interface PropagatingEffectDefinition {
   type: "propagate";
   operation: PropagationOperationDefinition;
   strategy: PropagationStrategyDefinition;
   magnitude: NumberDefinition;
   includeSeeds?: boolean;
+  seedFallback?: SeedFallbackDefinition;
   traversal?: PropagationTraversalDefinition;
   resistance?: ResistanceDefinition[];
   stoppingConditions?: PropagationStopDefinition[];

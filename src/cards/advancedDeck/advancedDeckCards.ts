@@ -1,20 +1,20 @@
 import { defineCard } from "../defineCard";
 import type { CardDefinition } from "../cardTypes";
 import {
-  autoCentreTileTarget,
   crossroadsTarget,
   desertWindOriginTarget,
   firstFoundationsTarget,
+  forestGrasslandPlayerTarget,
   forgottenInstructionTarget,
-  greenThroughStoneTarget,
   landBreaksOriginTarget,
   longRoadTarget,
   nearestRoadTarget,
+  playerNearCentreTarget,
+  playerWildlandTarget,
   randomBoundaryOriginTarget,
   randomChasmOriginTarget,
   randomNonWaterOriginTarget,
   randomSettlementRegionOriginTarget,
-  randomWaterOriginTarget,
   randomWildTerrainOriginTarget,
   roadBlockedTarget,
   roadNetworkOriginTarget,
@@ -23,6 +23,8 @@ import {
   settlementSpreadTarget,
   theLawChangesTarget,
   urbanRegionTarget,
+  waterRiverPlayerTarget,
+  waterSpreadTarget,
 } from "../cardTargets";
 import {
   chasmMarchesEffect,
@@ -30,8 +32,11 @@ import {
   desertWindEffect,
   echoWildSpreadEffect,
   edgeExpansionEffect,
+  greenThroughStoneEffect,
   landBreaksEffect,
   newCountryEffect,
+  rainOnBarrenGroundEffect,
+  riverFindsAWayEffect,
   stoneRisingEffect,
   theFloodComesEffect,
   theOldRoadHoldsEffect,
@@ -44,15 +49,37 @@ export const ADVANCED_DECK_CARDS: CardDefinition[] = [
     id: "green-beginning",
     name: "Green Beginning",
     category: "creation",
-    tags: ["terrain"],
+    tags: ["terrain", "biome-seed"],
     flavourText: "Before the roads, the wildland remembered itself.",
     rulesText:
-      "At the world centre, set one empty or grassland tile to grassland or forest. On failure, retarget to the nearest valid tile.",
-    target: autoCentreTileTarget([
+      "Choose empty or grassland within 2 tiles of the world centre. Create forest there and up to 2 adjacent grassland tiles. On failure, retarget to the nearest valid tile.",
+    target: playerNearCentreTarget([
       { type: "terrain-in", terrains: ["empty", "grassland"] },
     ]),
     conditions: [],
-    effects: [{ type: "set-random-terrain", terrains: ["grassland", "forest"] }],
+    effects: [
+      { type: "set-terrain", terrain: "forest" },
+      { type: "change-neighbouring-terrain", terrain: "grassland", count: 2 },
+    ],
+    failureBehaviours: {
+      selection: { type: "nearest-valid-target" },
+    },
+  }),
+
+  defineCard({
+    id: "spring-from-stone",
+    name: "Spring from Stone",
+    category: "creation",
+    tags: ["terrain", "water-seed"],
+    flavourText: "Water finds a crack and makes it a beginning.",
+    rulesText:
+      "Choose empty, grassland, or desert. Create water there and one adjacent grassland. On failure, target the nearest valid tile to the world centre.",
+    target: playerWildlandTarget(["empty", "grassland", "desert"]),
+    conditions: [],
+    effects: [
+      { type: "set-terrain", terrain: "water" },
+      { type: "change-neighbouring-terrain", terrain: "grassland", count: 1 },
+    ],
     failureBehaviours: {
       selection: { type: "nearest-valid-target" },
     },
@@ -62,7 +89,7 @@ export const ADVANCED_DECK_CARDS: CardDefinition[] = [
     id: "first-foundations",
     name: "First Foundations",
     category: "creation",
-    tags: ["settlement"],
+    tags: ["settlement", "settlement-seed"],
     flavourText: "Someone decides to stay.",
     rulesText:
       "Create a village on a random non-water, non-chasm tile without a settlement. On failure, choose a random valid tile.",
@@ -95,16 +122,55 @@ export const ADVANCED_DECK_CARDS: CardDefinition[] = [
     id: "creeping-wilds",
     name: "Creeping Wilds",
     category: "growth",
-    tags: ["terrain"],
+    tags: ["terrain", "biome-seed"],
     flavourText: "The forest does not ask permission.",
     rulesText:
-      "From random forest or grassland, spread forest through 4–7 tiles. Urban terrain resists; mountains block.",
-    target: randomWildTerrainOriginTarget(),
+      "Choose forest or grassland. Spread forest through 3–5 tiles, converting grassland seeds. If no wildland exists, create forest and grassland near the world centre.",
+    target: forestGrasslandPlayerTarget(),
     conditions: [
       { type: "terrain-is-not", terrain: "water" },
       { type: "terrain-is-not", terrain: "chasm" },
     ],
     effects: [creepingWildsDeckEffect()],
+  }),
+
+  defineCard({
+    id: "seeds-on-the-wind",
+    name: "Seeds on the Wind",
+    category: "growth",
+    tags: ["terrain", "biome-seed"],
+    flavourText: "A single seed crosses the waste and roots.",
+    rulesText:
+      "Choose empty, grassland, or desert. Create forest there and up to 2 adjacent grassland tiles.",
+    target: playerWildlandTarget(["empty", "grassland", "desert"]),
+    conditions: [
+      { type: "terrain-is-not", terrain: "water" },
+      { type: "terrain-is-not", terrain: "chasm" },
+      { type: "has-no-settlement" },
+    ],
+    effects: [
+      { type: "set-terrain", terrain: "forest" },
+      { type: "change-neighbouring-terrain", terrain: "grassland", count: 2 },
+    ],
+    failureBehaviours: {
+      selection: { type: "nearest-valid-target" },
+    },
+  }),
+
+  defineCard({
+    id: "rain-on-barren-ground",
+    name: "Rain on Barren Ground",
+    category: "transformation",
+    tags: ["terrain", "biome-seed", "water-seed"],
+    flavourText: "Rain remembers what stone forgot.",
+    rulesText:
+      "Choose empty or desert. Convert 2–4 connected tiles to grassland from that anchor.",
+    target: playerWildlandTarget(["empty", "desert"]),
+    conditions: [],
+    effects: [rainOnBarrenGroundEffect()],
+    failureBehaviours: {
+      selection: { type: "nearest-valid-target" },
+    },
   }),
 
   defineCard({
@@ -231,17 +297,26 @@ export const ADVANCED_DECK_CARDS: CardDefinition[] = [
     id: "the-flood-comes",
     name: "The Flood Comes",
     category: "transformation",
-    tags: ["terrain"],
+    tags: ["terrain", "water-seed"],
     flavourText: "Water remembers every road built across it.",
     rulesText:
-      "From random water, spread water through 4–8 nearby tiles. On failure with no water, discard.",
-    target: randomWaterOriginTarget(),
-    conditions: [{ type: "terrain-is", terrain: "water" }],
+      "Spread water through 3–6 tiles from existing water. If no water exists, create a 2-tile water source on valid land instead.",
+    target: waterSpreadTarget(),
+    conditions: [],
     effects: [theFloodComesEffect()],
-    failureBehaviours: {
-      selection: { type: "discard" },
-    },
-    defaultFailureBehaviour: { type: "discard" },
+  }),
+
+  defineCard({
+    id: "river-finds-a-way",
+    name: "River Finds a Way",
+    category: "connection",
+    tags: ["terrain", "water-seed"],
+    flavourText: "Water learns direction before it learns depth.",
+    rulesText:
+      "Choose water and extend a 2–4 tile river. If no water exists, create a source near the world centre and extend it.",
+    target: waterRiverPlayerTarget(),
+    conditions: [],
+    effects: [riverFindsAWayEffect()],
   }),
 
   defineCard({
@@ -251,10 +326,11 @@ export const ADVANCED_DECK_CARDS: CardDefinition[] = [
     tags: ["terrain", "rare"],
     flavourText: "The shore withdraws, leaving mud and memory.",
     rulesText:
-      "From random water, convert 2–4 water tiles to grassland along a random frontier.",
-    target: randomWaterOriginTarget(),
-    conditions: [{ type: "terrain-is", terrain: "water" }],
+      "Requires at least 5 water tiles. From random water, convert 2–4 water tiles to grassland along a random frontier.",
+    target: waterSpreadTarget(),
+    conditions: [],
     effects: [watersRecedeEffect()],
+    playRequirements: [{ type: "minimum-water-tiles", count: 5 }],
     failureBehaviours: {
       selection: { type: "discard" },
     },
@@ -265,20 +341,21 @@ export const ADVANCED_DECK_CARDS: CardDefinition[] = [
     id: "desert-wind",
     name: "Desert Wind",
     category: "transformation",
-    tags: ["terrain"],
+    tags: ["terrain", "destructive"],
     flavourText: "Dry air carries the colour of distance.",
     rulesText:
-      "From empty, grassland, or desert, spread desert directionally through 3–6 tiles.",
+      "Requires at least 5 grassland or forest tiles. From empty, grassland, or desert, spread desert directionally through 3–6 tiles.",
     target: desertWindOriginTarget(),
     conditions: [],
     effects: [desertWindEffect()],
+    playRequirements: [{ type: "minimum-productive-terrain", count: 5 }],
   }),
 
   defineCard({
     id: "the-land-breaks",
     name: "The Land Breaks",
     category: "transformation",
-    tags: ["terrain", "rare"],
+    tags: ["terrain", "rare", "destructive"],
     flavourText: "The earth opens and does not close.",
     rulesText:
       "Carve a short chasm line of 3 tiles from a random valid origin, then retire this card.",
@@ -296,7 +373,7 @@ export const ADVANCED_DECK_CARDS: CardDefinition[] = [
     id: "settlement-abandoned",
     name: "Settlement Abandoned",
     category: "destruction",
-    tags: ["settlement"],
+    tags: ["settlement", "destructive"],
     flavourText: "The last cart leaves before the sand arrives.",
     rulesText:
       "On a village in empty or desert terrain, advance village decline. On failure, target the nearest eligible village.",
@@ -332,13 +409,17 @@ export const ADVANCED_DECK_CARDS: CardDefinition[] = [
     id: "the-chasm-marches",
     name: "The Chasm Marches",
     category: "destruction",
-    tags: ["terrain", "rare"],
+    tags: ["terrain", "rare", "destructive"],
     flavourText: "The crack walks on.",
     rulesText:
-      "From random chasm, spread chasm directionally through 3–5 tiles. On failure, discard.",
+      "Requires an existing chasm and at least 12 map tiles. From random chasm, spread chasm directionally through 3–5 tiles. On failure, discard.",
     target: randomChasmOriginTarget(),
     conditions: [],
     effects: [chasmMarchesEffect()],
+    playRequirements: [
+      { type: "requires-terrain-present", terrain: "chasm" },
+      { type: "minimum-tile-count", count: 12 },
+    ],
     failureBehaviours: {
       selection: { type: "discard" },
     },
@@ -382,17 +463,16 @@ export const ADVANCED_DECK_CARDS: CardDefinition[] = [
     id: "green-through-stone",
     name: "Green Through Stone",
     category: "recovery",
-    tags: ["terrain", "rare"],
+    tags: ["terrain", "biome-seed"],
     flavourText: "Life finds the seam between desert and forest.",
     rulesText:
-      "On empty or desert adjacent to forest, set terrain to grassland or forest.",
-    target: greenThroughStoneTarget(),
-    conditions: [{ type: "adjacent-to-terrain", terrain: "forest" }],
-    effects: [{ type: "set-random-terrain", terrains: ["grassland", "forest"] }],
+      "Choose empty or desert. Convert 2–4 tiles to grassland. If no forest exists, create a forest seed near the world centre instead.",
+    target: playerWildlandTarget(["empty", "desert"]),
+    conditions: [],
+    effects: [greenThroughStoneEffect()],
     failureBehaviours: {
-      selection: { type: "discard" },
+      selection: { type: "nearest-valid-target" },
     },
-    defaultFailureBehaviour: { type: "discard" },
   }),
 
   defineCard({

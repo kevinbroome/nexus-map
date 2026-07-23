@@ -1,4 +1,5 @@
 import type { ConditionDefinition } from "../../cards/cardTypes";
+import { getWorldCentreTileId } from "../targeting/directions";
 import { tileExists } from "../../world/coordinates";
 import { getExistingNeighbours } from "../../world/neighbours";
 import { isBoundaryTile } from "../../world/tileCreation";
@@ -169,6 +170,22 @@ export function matchesTargetFilter(
 
       const metric = filter.metric ?? "manhattan";
       const distance = distanceBetween(tileId, context.originTileId, metric);
+
+      if (filter.minimum !== undefined && distance < filter.minimum) {
+        return false;
+      }
+
+      if (filter.maximum !== undefined && distance > filter.maximum) {
+        return false;
+      }
+
+      return true;
+    }
+
+    case "distance-from-world-centre": {
+      const centreId = getWorldCentreTileId(world);
+      const metric = filter.metric ?? "manhattan";
+      const distance = distanceBetween(tileId, centreId, metric);
 
       if (filter.minimum !== undefined && distance < filter.minimum) {
         return false;

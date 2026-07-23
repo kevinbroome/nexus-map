@@ -12,30 +12,40 @@ import {
 } from "../deck/createInitialDeck";
 import { FIRST_ADVANCED_TEST_DECK, DEFAULT_DECK_CONFIGURATION_ID } from "../deck/deckConfiguration";
 import { checkFreshWorldViability } from "../deck/deckViability";
+import {
+  OPENING_CARD_TAG_REQUIREMENTS,
+  OPENING_DRAW_COUNT,
+} from "../deck/openingDeckStack";
 import { simulateDeck } from "../deck/simulateDeck";
 import { validateDeckDefinitions } from "../deck/validateDeck";
 import { createTestWorld } from "../world/worldState";
 
+const EXPECTED_TOTAL_COPIES = getManifestTotalCopies();
+
 const EXPECTED_COPY_COUNTS: Record<string, number> = {
-  "green-beginning": 3,
+  "green-beginning": 2,
+  "spring-from-stone": 2,
   "first-foundations": 3,
   "stone-rising": 2,
   "creeping-wilds": 3,
+  "seeds-on-the-wind": 2,
+  "rain-on-barren-ground": 2,
+  "green-through-stone": 2,
+  "the-flood-comes": 2,
+  "river-finds-a-way": 1,
   "settlement-spreads": 2,
-  "urban-pressure": 2,
+  "urban-pressure": 1,
   "the-road-between": 3,
   "the-long-road": 1,
   crossroads: 1,
-  "the-flood-comes": 2,
   "the-waters-recede": 1,
-  "desert-wind": 2,
+  "desert-wind": 1,
   "the-land-breaks": 1,
-  "settlement-abandoned": 2,
+  "settlement-abandoned": 1,
   "road-blocked": 1,
   "the-chasm-marches": 1,
   "the-emptying": 1,
   reclamation: 1,
-  "green-through-stone": 1,
   "the-old-road-holds": 1,
   "edge-of-the-known": 2,
   "new-country": 1,
@@ -59,10 +69,10 @@ describe("first advanced test deck", () => {
   const definitions = getAllCardDefinitions();
 
   describe("deck composition", () => {
-    it("contains forty total copies across twenty-five unique cards", () => {
-      expect(getManifestTotalCopies()).toBe(40);
-      expect(FIRST_ADVANCED_TEST_DECK_MANIFEST).toHaveLength(25);
-      expect(ADVANCED_DECK_CARDS).toHaveLength(25);
+    it("contains the expected total copies across twenty-nine unique cards", () => {
+      expect(getManifestTotalCopies()).toBe(EXPECTED_TOTAL_COPIES);
+      expect(FIRST_ADVANCED_TEST_DECK_MANIFEST).toHaveLength(29);
+      expect(ADVANCED_DECK_CARDS).toHaveLength(29);
     });
 
     it("matches the specified copy distribution", () => {
@@ -105,7 +115,26 @@ describe("first advanced test deck", () => {
       expect(left.drawPile.map((entry) => entry.instanceId)).toEqual(
         right.drawPile.map((entry) => entry.instanceId),
       );
-      expect(left.drawPile).toHaveLength(40);
+      expect(left.drawPile).toHaveLength(EXPECTED_TOTAL_COPIES);
+    });
+
+    it("pins biome, water, and settlement seeds in the opening draw window", () => {
+      const deck = createDeckFromConfiguration(
+        FIRST_ADVANCED_TEST_DECK.manifest,
+        definitions,
+        "opening-stack-seed",
+        0,
+      );
+      const definitionMap = new Map(definitions.map((entry) => [entry.id, entry]));
+      const opening = deck.drawPile.slice(0, OPENING_DRAW_COUNT);
+
+      for (const tag of OPENING_CARD_TAG_REQUIREMENTS) {
+        expect(
+          opening.some((instance) =>
+            definitionMap.get(instance.definitionId)?.tags.includes(tag),
+          ),
+        ).toBe(true);
+      }
     });
 
     it("wires the default deck configuration", () => {
@@ -115,7 +144,7 @@ describe("first advanced test deck", () => {
   });
 
   describe("fresh-world behaviour", () => {
-    it("can play at least one card immediately on an empty world", () => {
+    it("can play biome and water seed cards immediately on an empty world", () => {
       const world = createTestWorld("Fresh", 5, 5);
       const viability = checkFreshWorldViability(
         world,
@@ -124,10 +153,17 @@ describe("first advanced test deck", () => {
       );
 
       expect(viability.viable).toBe(true);
-      expect(viability.immediatelyPlayable).toContain("green-beginning");
+      expect(viability.immediatelyPlayable).toEqual(
+        expect.arrayContaining([
+          "green-beginning",
+          "spring-from-stone",
+          "the-flood-comes",
+          "seeds-on-the-wind",
+        ]),
+      );
     });
 
-    it("treats water, road, and ruin cards as temporarily blocked with safe failures", () => {
+    it("treats conditional and infrastructure cards as temporarily blocked", () => {
       const world = createTestWorld("Fresh", 5, 5);
       const viability = checkFreshWorldViability(
         world,
@@ -137,13 +173,15 @@ describe("first advanced test deck", () => {
 
       expect(viability.temporarilyBlocked).toEqual(
         expect.arrayContaining([
-          "the-flood-comes",
           "the-waters-recede",
+          "desert-wind",
+          "the-chasm-marches",
           "the-old-road-holds",
           "reclamation",
           "road-blocked",
         ]),
       );
+      expect(viability.temporarilyBlocked).not.toContain("the-flood-comes");
     });
   });
 
@@ -196,8 +234,10 @@ describe("first advanced test deck", () => {
       );
       const result = simulateDeck(world, 30, "sim-seed-c");
 
-      expect(result.metrics.maxPropagationSteps).toBeLessThanOrEqual(40);
-      expect(result.finalWorld.deck.drawPile.length).toBeLessThanOrEqual(40);
+      expect(result.metrics.maxPropagationSteps).toBeLessThanOrEqual(80);
+      expect(result.finalWorld.deck.drawPile.length).toBeLessThanOrEqual(
+        EXPECTED_TOTAL_COPIES,
+      );
     });
   });
 
@@ -222,7 +262,7 @@ describe("first advanced test deck", () => {
 
     it("falls back to legacy initial deck creation without a manifest", () => {
       const deck = createInitialDeck(definitions, "legacy-seed", 0);
-      expect(deck.drawPile.length).toBeGreaterThanOrEqual(39);
+      expect(deck.drawPile.length).toBeGreaterThanOrEqual(EXPECTED_TOTAL_COPIES - 1);
     });
   });
 });
