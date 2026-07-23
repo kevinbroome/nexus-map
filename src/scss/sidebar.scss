@@ -1,0 +1,253 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+#sidebar {
+  padding: 1rem;
+  border-right: 1px solid $color-border;
+  background: $color-sidebar-bg;
+  overflow-y: auto;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+
+  @include mobile {
+    border-right: none;
+    border-bottom: 1px solid $color-border;
+    max-height: $sidebar-mobile-max-height;
+  }
+
+  h1 {
+    margin-top: 0;
+  }
+
+  h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1.1rem;
+  }
+}
+
+#selected-location {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.world-summary,
+.dev-inspection-detail {
+  margin: 0 0 0.75rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  white-space: pre-line;
+  color: $color-text;
+}
+
+#status-message {
+  margin: 0 0 1rem;
+  color: $color-text-muted;
+  font-size: 0.9rem;
+  white-space: pre-line;
+
+  &[data-error="true"] {
+    color: $color-error;
+    font-weight: 600;
+  }
+}
+
+.persistence-status {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: $color-text-subtle;
+
+  &[data-status="local-saving"],
+  &[data-status="cloud-saving"] {
+    color: $color-warning;
+  }
+
+  &[data-status="local-saved"] {
+    color: $color-success;
+  }
+
+  &[data-status="local-failed"],
+  &[data-status="auth-required"],
+  &[data-status="conflict"] {
+    color: $color-error;
+    font-weight: 600;
+  }
+
+  &[data-status="cloud-connected"],
+  &[data-status="cloud-saved"] {
+    color: $color-cloud-accent;
+  }
+}
+
+.cloud-diagnostics {
+  margin: 0.75rem 0 0;
+  padding: $space-panel;
+  border: 1px dashed #cbd5e1;
+  border-radius: $radius-panel;
+  background: #f8fafc;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+}
+
+.cloud-auth {
+  margin: 0 0 1rem;
+  padding: $space-panel;
+  border: 1px solid $color-cloud-border;
+  border-radius: $radius-panel;
+  background: $color-cloud-bg;
+
+  h2 {
+    margin: 0 0 0.5rem;
+    font-size: 0.95rem;
+  }
+
+  label {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  input {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    box-sizing: border-box;
+  }
+
+  &.cloud-auth--signed-in {
+    padding: 0.5rem $space-panel;
+
+    h2,
+    #auth-user-label,
+    #auth-status-message,
+    label,
+    input,
+    #auth-sign-in,
+    #auth-sign-up {
+      display: none;
+    }
+
+    .cloud-auth-actions {
+      margin-top: 0;
+    }
+  }
+}
+
+.cloud-auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+#recovery-panel {
+  margin: 0 0 1rem;
+  padding: $space-panel;
+  border: 1px solid $color-error-border;
+  border-radius: $radius-panel;
+  background: $color-error-bg;
+}
+
+#recovery-message {
+  margin: 0 0 0.75rem;
+  color: $color-error-text;
+  font-size: 0.9rem;
+}
+
+#create-new-world {
+  @include panel-button;
+}
+
+#draw-card,
+.sidebar-actions button,
+.dev-actions button {
+  @include panel-button;
+}
+
+#selection-modes {
+  margin: 0 0 1rem;
+  padding: $space-panel;
+  border: 1px solid $color-border;
+  border-radius: $radius-panel;
+
+  legend {
+    padding: 0 0.25rem;
+    font-size: 0.9rem;
+  }
+
+  label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.9rem;
+  }
+}
+
+.sidebar-actions {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+
+  button:disabled {
+    @include disabled-control;
+  }
+}
+
+#dev-tools.dev-tools-accordion {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid $color-border;
+
+  summary {
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 700;
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+  }
+
+  &[open] summary {
+    margin-bottom: 0.75rem;
+  }
+}
+
+.dev-inspection {
+  margin-top: 0.75rem;
+  padding: $space-panel;
+  border: 1px dashed $color-border;
+  border-radius: $radius-panel;
+  font-size: 0.85rem;
+
+  p {
+    margin: 0 0 0.35rem;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
+.dev-actions {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+
+  button:disabled {
+    @include disabled-control;
+  }
+}
+
+.dev-visual-controls {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+
+  label {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    font-size: 0.82rem;
+  }
+}

@@ -1,0 +1,6 @@
+// Entry point: Vite compiles this bundle for the app shell.
+// Source is split into base, sidebar, map, and cards partials.
+@use "base";
+@use "sidebar";
+@use "map";
+@use "cards";

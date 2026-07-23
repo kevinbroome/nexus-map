@@ -1,0 +1,24 @@
+@use "variables" as *;
+
+@mixin mobile {
+  @media (max-width: ($breakpoint-mobile - 1px)) {
+    @content;
+  }
+}
+
+@mixin desktop {
+  @media (min-width: $breakpoint-mobile) {
+    @content;
+  }
+}
+
+@mixin panel-button {
+  width: 100%;
+  padding: $space-panel;
+  cursor: pointer;
+}
+
+@mixin disabled-control {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
