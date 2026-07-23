@@ -135,6 +135,23 @@ export interface WorldAction {
 }
 
 export interface WorldState {
+  version: 6;
+  id: string;
+  name: string;
+  turn: number;
+  tiles: Record<string, MapTile>;
+  settlementRegions: Record<string, SettlementRegion>;
+  travelRoutes: Record<string, TravelRoute>;
+  deck: DeckState;
+  deckConfigurationId: string;
+  history: WorldAction[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const CURRENT_WORLD_VERSION = 6 as const;
+
+export type LegacyWorldStateV5 = {
   version: 5;
   id: string;
   name: string;
@@ -146,9 +163,7 @@ export interface WorldState {
   history: WorldAction[];
   createdAt: string;
   updatedAt: string;
-}
-
-export const CURRENT_WORLD_VERSION = 5 as const;
+};
 
 export type LegacyWorldStateV4 = {
   version: 4;

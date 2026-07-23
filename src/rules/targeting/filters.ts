@@ -100,6 +100,15 @@ export function matchesTargetFilter(
       );
     }
 
+    case "settlement-region-tier-in":
+      if (!exists) {
+        return false;
+      }
+
+      return findRegionsContainingTile(world.settlementRegions, tileId).some(
+        (region) => filter.tiers.includes(region.tier),
+      );
+
     case "adjacent-to-terrain":
       if (!exists) {
         return false;

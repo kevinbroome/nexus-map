@@ -43,6 +43,18 @@ export type EffectDefinition =
       count: number;
     }
   | { type: "add-tag"; tag: string }
+  | { type: "remove-tag"; tag: string }
+  | {
+      type: "set-random-terrain";
+      terrains: TerrainType[];
+    }
+  | { type: "advance-village-decline"; amount?: number }
+  | { type: "restore-village-from-ruin" }
+  | {
+      type: "empty-urban-region";
+      tileLimit: number;
+      leaveRuins: boolean;
+    }
   | PropagatingEffectDefinition
   | {
       type: "create-travel-route";
@@ -60,10 +72,33 @@ export type { TargetDefinition } from "../rules/targeting/types";
 
 import type { TargetDefinition } from "../rules/targeting/types";
 
+export type CardCategory =
+  | "creation"
+  | "growth"
+  | "connection"
+  | "transformation"
+  | "destruction"
+  | "recovery"
+  | "expansion"
+  | "deck";
+
+export type CardTag =
+  | "terrain"
+  | "settlement"
+  | "road"
+  | "ruin"
+  | "boundary"
+  | "rare";
+
 export interface CardDefinition {
   id: string;
   name: string;
+  /** @deprecated Use rulesText for player-facing copy. Kept for compatibility. */
   description: string;
+  rulesText: string;
+  flavourText?: string;
+  category: CardCategory;
+  tags: CardTag[];
   target: TargetDefinition;
   conditions: ConditionDefinition[];
   effects: EffectDefinition[];

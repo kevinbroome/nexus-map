@@ -45,6 +45,7 @@ import {
   formatLoadedWorldMessage,
   getSidebarElements,
   renderSidebar,
+  wireDevVisualControls,
   type AppState,
 } from "./ui/sidebar";
 import {
@@ -63,6 +64,8 @@ import {
 } from "./world/tileCreation";
 import { createStarterWorld } from "./world/worldState";
 import type { WorldState } from "./world/worldTypes";
+import { getDevVisualControls } from "./visuals/devVisualControls";
+import { initializeMapTheme } from "./visuals/themeManager";
 
 type StartupResult = {
   world: WorldState | null;
@@ -154,7 +157,7 @@ function getTileHighlights(state: AppState): TileHighlightState {
   }
 
   const resolution = state.proposedAction?.targetResolution;
-  const showPipeline = import.meta.env.DEV;
+  const showPipeline = import.meta.env.DEV && getDevVisualControls().showPreviewPipeline;
   const propagationProposal = state.proposedAction;
   const candidateIds = resolution?.candidateIds ?? [];
   const filteredIds = resolution?.filteredCandidateIds ?? [];
@@ -213,6 +216,7 @@ function getDisplayWorld(state: AppState): WorldState | null {
 }
 
 function bootstrap(): void {
+  initializeMapTheme();
   const sidebar = getSidebarElements();
   const startup = initializeWorld();
   let state = createInitialState(startup);
@@ -249,12 +253,19 @@ function bootstrap(): void {
       getTileHighlights(state),
       onTileSelect,
       onRouteSelect,
+      state.selection.tileIds,
     );
+
+    worldMap.map.on("zoomend", () => {
+      refresh();
+    });
   }
 
   if (state.world) {
     mountWorldMap(state.world);
   }
+
+  wireDevVisualControls(sidebar, () => refresh());
 
   function refresh(options?: { fitMap?: boolean }): void {
     const displayWorld = getDisplayWorld(state);
@@ -273,6 +284,7 @@ function bootstrap(): void {
         onTileSelect,
         onRouteSelect,
         state.proposedAction?.proposedRoutes[0]?.route ?? null,
+        state.selection.tileIds,
       );
     }
 
@@ -311,6 +323,10 @@ function bootstrap(): void {
       };
     }
 
+    refresh();
+  });
+
+  sidebar.catalogueFilter.addEventListener("change", () => {
     refresh();
   });
 

@@ -20,7 +20,14 @@ export type DevScenarioId =
   | "water-separated"
   | "existing-road-network"
   | "negative-coordinate-route"
-  | "already-connected";
+  | "already-connected"
+  | "visual-coastline"
+  | "visual-forest-mountain"
+  | "visual-urban-hierarchy"
+  | "visual-road-network"
+  | "visual-ruin-cluster"
+  | "visual-chasm-cut"
+  | "visual-label-collision";
 
 function setTile(
   world: WorldState,
@@ -232,6 +239,78 @@ export function createDevScenario(scenarioId: DevScenarioId): WorldState {
       );
       break;
 
+    case "visual-coastline":
+      for (let x = -2; x <= 5; x++) {
+        for (let y = -2; y <= 3; y++) {
+          world = withTerrain(world, x, y, x <= 0 ? "water" : "grassland");
+        }
+      }
+      world = withTerrain(world, 2, 1, "water");
+      world = withTerrain(world, 3, 2, "forest");
+      break;
+
+    case "visual-forest-mountain":
+      for (let x = 0; x <= 5; x++) {
+        world = withTerrain(world, x, 0, "grassland");
+        world = withTerrain(world, x, 1, x <= 2 ? "forest" : "mountain");
+        world = withTerrain(world, x, 2, "desert");
+      }
+      break;
+
+    case "visual-urban-hierarchy":
+      for (let x = 0; x < 5; x++) {
+        for (let y = 0; y < 3; y++) {
+          world = withVillage(world, x, y, 0, "urban");
+        }
+      }
+      break;
+
+    case "visual-road-network":
+      world = withVillage(world, 0, 0);
+      world = withVillage(world, 4, 0);
+      world = withVillage(world, 2, 3);
+      for (let x = 0; x <= 4; x++) {
+        world = withTerrain(world, x, 0, "grassland");
+      }
+      for (let y = 1; y <= 3; y++) {
+        world = withTerrain(world, 2, y, "forest");
+      }
+      world = withRoad(
+        world,
+        resolveTravelEndpoint(world, "village", "0,0"),
+        resolveTravelEndpoint(world, "village", "4,0"),
+        ["0,0", "1,0", "2,0", "3,0", "4,0"],
+      );
+      world = withRoad(
+        world,
+        resolveTravelEndpoint(world, "village", "2,0"),
+        resolveTravelEndpoint(world, "village", "2,3"),
+        ["2,0", "2,1", "2,2", "2,3"],
+      );
+      break;
+
+    case "visual-ruin-cluster":
+      world = withRuin(world, 0, 0);
+      world = withRuin(world, 1, 0);
+      world = withRuin(world, 0, 1);
+      world = withTerrain(world, 2, 0, "grassland");
+      world = withTerrain(world, 1, 1, "desert");
+      break;
+
+    case "visual-chasm-cut":
+      for (let x = 0; x <= 5; x++) {
+        world = withTerrain(world, x, 0, "urban");
+        world = withTerrain(world, x, 1, x === 2 || x === 3 ? "chasm" : "urban");
+      }
+      break;
+
+    case "visual-label-collision":
+      for (let x = 0; x < 6; x++) {
+        world = withVillage(world, x, 0, 0, "grassland");
+        world = withVillage(world, x, 1, 0, "grassland");
+      }
+      break;
+
     default: {
       const unreachable: never = scenarioId;
       throw new Error(`Unknown dev scenario: ${String(unreachable)}`);
@@ -255,4 +334,11 @@ export const DEV_SCENARIO_IDS: DevScenarioId[] = [
   "existing-road-network",
   "negative-coordinate-route",
   "already-connected",
+  "visual-coastline",
+  "visual-forest-mountain",
+  "visual-urban-hierarchy",
+  "visual-road-network",
+  "visual-ruin-cluster",
+  "visual-chasm-cut",
+  "visual-label-collision",
 ];

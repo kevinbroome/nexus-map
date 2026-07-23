@@ -35,6 +35,24 @@ import {
   formatSettlementSummary,
   getSettlementSummary,
 } from "../worldLaws/settlementSummary";
+import {
+  formatDeckCatalogueForWorld,
+  type CatalogueFilter,
+} from "./cardCatalogue";
+import {
+  DEV_VISUAL_CONTROL_OPTIONS,
+  getDevVisualControls,
+  setDevVisualControl,
+} from "../visuals/devVisualControls";
+import { buildPreviewLegendEntries } from "../visuals/renderers/mapVisualRenderer";
+import { getMapTheme } from "../visuals/themeManager";
+import {
+  getConsequencePreviewTileIds,
+  getPreviewTileIds,
+  getPropagationAffectedTileIds,
+  getPropagationBlockedTileIds,
+  getPropagationCreatedTileIds,
+} from "../rules/engine";
 
 export type AppState = {
   world: WorldState | null;
@@ -68,6 +86,8 @@ export type SidebarElements = {
   applyCardButton: HTMLButtonElement;
   discardCardButton: HTMLButtonElement;
   deckSummary: HTMLPreElement;
+  catalogueFilter: HTMLSelectElement;
+  catalogueContent: HTMLPreElement;
   devInspectionCardinal: HTMLParagraphElement;
   devInspectionAll: HTMLParagraphElement;
   devInspectionRegion: HTMLParagraphElement;
@@ -77,6 +97,9 @@ export type SidebarElements = {
   devInspectionTargeting: HTMLPreElement;
   devInspectionPropagation: HTMLPreElement;
   devInspectionDeck: HTMLPreElement;
+  devVisualControls: HTMLFieldSetElement;
+  previewLegend: HTMLElement;
+  previewLegendList: HTMLUListElement;
 };
 
 export function getSidebarElements(): SidebarElements {
@@ -120,6 +143,10 @@ export function getSidebarElements(): SidebarElements {
   const discardCardButton =
     document.querySelector<HTMLButtonElement>("#discard-card");
   const deckSummary = document.querySelector<HTMLPreElement>("#deck-summary");
+  const catalogueFilter =
+    document.querySelector<HTMLSelectElement>("#catalogue-filter");
+  const catalogueContent =
+    document.querySelector<HTMLPreElement>("#catalogue-content");
   const devInspectionCardinal = document.querySelector<HTMLParagraphElement>(
     "#dev-inspection-cardinal",
   );
@@ -147,6 +174,13 @@ export function getSidebarElements(): SidebarElements {
   const devInspectionDeck = document.querySelector<HTMLPreElement>(
     "#dev-inspection-deck",
   );
+  const devVisualControls = document.querySelector<HTMLFieldSetElement>(
+    "#dev-visual-controls",
+  );
+  const previewLegend = document.querySelector<HTMLElement>("#preview-legend");
+  const previewLegendList = document.querySelector<HTMLUListElement>(
+    "#preview-legend-list",
+  );
 
   if (
     !selectedLocation ||
@@ -170,6 +204,8 @@ export function getSidebarElements(): SidebarElements {
     !applyCardButton ||
     !discardCardButton ||
     !deckSummary ||
+    !catalogueFilter ||
+    !catalogueContent ||
     !devInspectionCardinal ||
     !devInspectionAll ||
     !devInspectionRegion ||
@@ -178,7 +214,10 @@ export function getSidebarElements(): SidebarElements {
     !devInspectionRouteDetail ||
     !devInspectionTargeting ||
     !devInspectionPropagation ||
-    !devInspectionDeck
+    !devInspectionDeck ||
+    !devVisualControls ||
+    !previewLegend ||
+    !previewLegendList
   ) {
     throw new Error("Sidebar elements are missing from the page.");
   }
@@ -205,6 +244,8 @@ export function getSidebarElements(): SidebarElements {
     applyCardButton,
     discardCardButton,
     deckSummary,
+    catalogueFilter,
+    catalogueContent,
     devInspectionCardinal,
     devInspectionAll,
     devInspectionRegion,
@@ -214,7 +255,40 @@ export function getSidebarElements(): SidebarElements {
     devInspectionTargeting,
     devInspectionPropagation,
     devInspectionDeck,
+    devVisualControls,
+    previewLegend,
+    previewLegendList,
   };
+}
+
+export function wireDevVisualControls(
+  elements: SidebarElements,
+  onChange: () => void,
+): void {
+  if (!import.meta.env.DEV) {
+    elements.devVisualControls.hidden = true;
+    return;
+  }
+
+  if (elements.devVisualControls.dataset.wired === "true") {
+    return;
+  }
+
+  elements.devVisualControls.dataset.wired = "true";
+  const controls = getDevVisualControls();
+
+  for (const option of DEV_VISUAL_CONTROL_OPTIONS) {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = controls[option.key];
+    input.addEventListener("change", () => {
+      setDevVisualControl(option.key, input.checked);
+      onChange();
+    });
+    label.append(input, document.createTextNode(option.label));
+    elements.devVisualControls.append(label);
+  }
 }
 
 function formatRegionLine(
@@ -513,8 +587,74 @@ export function renderSidebar(
   elements.deckSummary.textContent = state.world
     ? formatDeckSummary(state.world)
     : "";
+  elements.catalogueContent.textContent = state.world
+    ? formatDeckCatalogueForWorld(
+        state.world.deckConfigurationId,
+        elements.catalogueFilter.value as CatalogueFilter,
+      )
+    : "";
   elements.devInspectionDeck.textContent =
     import.meta.env.DEV && state.world ? formatDevDeckPiles(state.world) : "";
+
+  if (state.proposedAction) {
+    const routeOrigin = new Set<string>();
+    const routeDestination = new Set<string>();
+
+    if (state.selection.routeOriginTileId) {
+      routeOrigin.add(state.selection.routeOriginTileId);
+    }
+
+    if (state.selection.routeDestinationTileId) {
+      routeDestination.add(state.selection.routeDestinationTileId);
+    }
+
+    const legendEntries = buildPreviewLegendEntries(
+      {
+        selected: new Set(state.selection.tileIds),
+        preview: new Set(getPreviewTileIds(state.proposedAction)),
+        consequencePreview: new Set(
+          getConsequencePreviewTileIds(state.proposedAction),
+        ),
+        routeOrigin,
+        routeDestination,
+        propagation:
+          state.proposedAction.propagationResults.length > 0
+            ? {
+                showFullPath: false,
+                seed: new Set(),
+                affected: new Set(
+                  getPropagationAffectedTileIds(state.proposedAction),
+                ),
+                created: new Set(
+                  getPropagationCreatedTileIds(state.proposedAction),
+                ),
+                traversed: new Set(),
+                blocked: new Set(
+                  getPropagationBlockedTileIds(state.proposedAction),
+                ),
+              }
+            : undefined,
+      },
+      getMapTheme(),
+    );
+
+    if (legendEntries.length > 0) {
+      elements.previewLegend.hidden = false;
+      elements.previewLegendList.replaceChildren(
+        ...legendEntries.map((entry) => {
+          const item = document.createElement("li");
+          item.textContent = entry;
+          return item;
+        }),
+      );
+    } else {
+      elements.previewLegend.hidden = true;
+      elements.previewLegendList.replaceChildren();
+    }
+  } else {
+    elements.previewLegend.hidden = true;
+    elements.previewLegendList.replaceChildren();
+  }
   elements.statusMessage.textContent = state.loadError ?? state.statusMessage;
   elements.statusMessage.dataset.error = state.loadError ? "true" : "false";
   elements.recoveryPanel.hidden = state.loadError === null;

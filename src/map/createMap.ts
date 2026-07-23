@@ -4,18 +4,23 @@ import { getExistingTiles } from "../world/coordinates";
 import type { TravelRoute } from "../networks/networkTypes";
 import type { WorldState } from "../world/worldTypes";
 import { TILE_SIZE } from "./mapConfig";
-import { getRenderableTileIds, worldBoundsToLeafletBounds } from "./mapBounds";
+import { worldBoundsToLeafletBounds } from "./mapBounds";
+import type { TileHighlightState } from "./tileLayer";
+import { getDevVisualControls } from "../visuals/devVisualControls";
+import { initializeMapTheme } from "../visuals/themeManager";
 import {
-  renderCommittedRoutes,
-  renderRoutePreview,
-} from "./routeLayer";
-import { createTileLayer, type TileHighlightState } from "./tileLayer";
+  clearMapLayerGroups,
+  createMapLayerGroups,
+  type MapLayerGroups,
+} from "../visuals/renderers/mapLayerGroups";
+import {
+  getDetailLevelForMap,
+  renderVisualMap,
+} from "../visuals/renderers/mapVisualRenderer";
 
 export type WorldMapView = {
   map: L.Map;
-  tileLayerGroup: L.LayerGroup;
-  routeLayerGroup: L.LayerGroup;
-  previewRouteLayerGroup: L.LayerGroup;
+  layers: MapLayerGroups;
 };
 
 function getLeafletWorldBounds(world: WorldState): L.LatLngBounds {
@@ -42,7 +47,10 @@ export function createWorldMap(
   highlights: TileHighlightState,
   onSelect: (tileId: string) => void,
   onSelectRoute?: (routeId: string) => void,
+  selectedTileIds: string[] = [],
 ): WorldMapView {
+  initializeMapTheme();
+
   const map = L.map(containerId, {
     crs: L.CRS.Simple,
     minZoom: -2,
@@ -52,19 +60,19 @@ export function createWorldMap(
 
   fitMapToWorld(map, world);
 
-  const tileLayerGroup = L.layerGroup().addTo(map);
-  const routeLayerGroup = L.layerGroup().addTo(map);
-  const previewRouteLayerGroup = L.layerGroup().addTo(map);
+  const layers = createMapLayerGroups(map);
 
   renderWorldMap(
-    { map, tileLayerGroup, routeLayerGroup, previewRouteLayerGroup },
+    { map, layers },
     world,
     highlights,
     onSelect,
     onSelectRoute,
+    null,
+    selectedTileIds,
   );
 
-  return { map, tileLayerGroup, routeLayerGroup, previewRouteLayerGroup };
+  return { map, layers };
 }
 
 export function renderWorldMap(
@@ -74,55 +82,21 @@ export function renderWorldMap(
   onSelect: (tileId: string) => void,
   onSelectRoute?: (routeId: string) => void,
   previewRoute?: TravelRoute | null,
+  selectedTileIds: string[] = [],
 ): void {
-  renderWorldTiles(view.tileLayerGroup, world, highlights, onSelect);
-  renderWorldRoutes(view.routeLayerGroup, world, onSelectRoute);
-  renderPreviewRoute(view.previewRouteLayerGroup, world, previewRoute ?? null);
-}
+  clearMapLayerGroups(view.layers);
 
-export function renderWorldTiles(
-  tileLayerGroup: L.LayerGroup,
-  world: WorldState,
-  highlights: TileHighlightState,
-  onSelect: (tileId: string) => void,
-): void {
-  tileLayerGroup.clearLayers();
-
-  for (const tileId of getRenderableTileIds(world)) {
-    const tile = world.tiles[tileId];
-
-    if (!tile) {
-      continue;
-    }
-
-    createTileLayer(tile, highlights, onSelect).addTo(tileLayerGroup);
-  }
-}
-
-export function renderWorldRoutes(
-  routeLayerGroup: L.LayerGroup,
-  world: WorldState,
-  onSelectRoute?: (routeId: string) => void,
-): void {
-  routeLayerGroup.clearLayers();
-  renderCommittedRoutes(
-    routeLayerGroup,
-    world.travelRoutes,
-    world.tiles,
+  renderVisualMap(view.map, view.layers, world, {
+    theme: initializeMapTheme(),
+    highlights,
+    detailLevel: getDetailLevelForMap(view.map),
+    devControls: import.meta.env.DEV ? getDevVisualControls() : undefined,
+    previewRoute: previewRoute ?? null,
+    selectedTileIds,
+    onSelectTile: onSelect,
     onSelectRoute,
-  );
-}
-
-export function renderPreviewRoute(
-  previewRouteLayerGroup: L.LayerGroup,
-  world: WorldState,
-  previewRoute: TravelRoute | null,
-): void {
-  previewRouteLayerGroup.clearLayers();
-
-  if (previewRoute) {
-    renderRoutePreview(previewRouteLayerGroup, previewRoute, world.tiles);
-  }
+    isDevMode: import.meta.env.DEV,
+  });
 }
 
 export function getRenderedTileCount(world: WorldState): number {

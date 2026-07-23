@@ -1,0 +1,268 @@
+import type { MapVisualTheme } from "../theme";
+
+const terrain = (
+  baseColor: string,
+  overrides: Partial<MapVisualTheme["terrain"]["empty"]> = {},
+) => ({
+  baseColor,
+  opacity: 1,
+  ...overrides,
+});
+
+export const WORKING_ATLAS_THEME: MapVisualTheme = {
+  id: "working-atlas",
+  name: "Working Atlas",
+  background: {
+    color: "#e8dfd0",
+    textureOpacity: 0.06,
+  },
+  terrain: {
+    empty: terrain("#d8d0b8", {
+      borderColor: "#c9c0a8",
+      patternId: "paper-noise",
+      boundary: { stroke: "#c9c0a8", weight: 0.5, smoothing: "none" },
+    }),
+    water: terrain("#668fa3", {
+      patternId: "paper-noise",
+      coastline: {
+        outerStroke: "#4a6678",
+        outerWeight: 2.5,
+        innerStroke: "#8fb0c0",
+        innerWeight: 1,
+      },
+      boundary: { stroke: "#4a6678", weight: 2, smoothing: "coastline" },
+    }),
+    grassland: terrain("#9cab75", {
+      boundary: { stroke: "#7f915f", weight: 0.75, smoothing: "soft" },
+    }),
+    forest: terrain("#55735a", {
+      patternId: "forest-stipple",
+      boundary: { stroke: "#3f5343", weight: 1.25, smoothing: "soft" },
+    }),
+    mountain: terrain("#827b72", {
+      patternId: "mountain-angular",
+      boundary: { stroke: "#5f5952", weight: 1.5, smoothing: "angular" },
+    }),
+    urban: terrain("#a59181", {
+      patternId: "urban-grid",
+      boundary: { stroke: "#7a6a5d", weight: 1.5, smoothing: "none" },
+    }),
+    chasm: terrain("#2f2a24", {
+      patternId: "chasm-fracture",
+      borderColor: "#0f0d0b",
+      boundary: { stroke: "#0f0d0b", weight: 2.5, smoothing: "none" },
+    }),
+    desert: terrain("#c4a574", {
+      patternId: "desert-dots",
+      boundary: {
+        stroke: "#9a8458",
+        weight: 1,
+        dashArray: "3 4",
+        smoothing: "soft",
+      },
+    }),
+  },
+  grid: {
+    showAtDetailLevel: "local",
+    stroke: "#8a7f6e",
+    weight: 0.5,
+    opacity: 0.35,
+  },
+  roads: {
+    road: {
+      outerColor: "#3f2a14",
+      outerWeight: 5,
+      innerColor: "#b08968",
+      innerWeight: 2.5,
+      opacity: 0.92,
+      markerAtEndpoints: true,
+      markerAtIntersections: true,
+    },
+    trail: {
+      outerColor: "#57534e",
+      outerWeight: 2,
+      innerColor: "#a8a29e",
+      innerWeight: 1,
+      opacity: 0.75,
+      dashArray: "4 6",
+      previewDashArray: "3 5",
+      markerAtEndpoints: false,
+      markerAtIntersections: false,
+    },
+    railway: {
+      outerColor: "#1f2937",
+      outerWeight: 4,
+      innerColor: "#9ca3af",
+      innerWeight: 1.5,
+      opacity: 0.85,
+      markerAtEndpoints: true,
+      markerAtIntersections: true,
+    },
+    canal: {
+      outerColor: "#0c4a6e",
+      outerWeight: 3,
+      innerColor: "#7dd3fc",
+      innerWeight: 1,
+      opacity: 0.85,
+      markerAtEndpoints: false,
+      markerAtIntersections: false,
+    },
+  },
+  settlements: {
+    village: {
+      shape: "dot",
+      fill: "#7c2d12",
+      stroke: "#fef3c7",
+      size: 5,
+      labelAtDetailLevel: "local",
+    },
+    town: {
+      shape: "ring",
+      fill: "#ffffff",
+      stroke: "#7c2d12",
+      size: 7,
+      labelAtDetailLevel: "regional",
+    },
+    expanse: {
+      shape: "cluster",
+      fill: "#fef3c7",
+      stroke: "#92400e",
+      size: 9,
+      labelAtDetailLevel: "regional",
+    },
+    urban: {
+      shape: "block",
+      fill: "#44403c",
+      stroke: "#fafaf9",
+      size: 10,
+      labelAtDetailLevel: "regional",
+    },
+    quadrant: {
+      shape: "multi",
+      fill: "#292524",
+      stroke: "#fde68a",
+      size: 12,
+      labelAtDetailLevel: "world",
+    },
+    sunder: {
+      shape: "rare",
+      fill: "#581c87",
+      stroke: "#f5d0fe",
+      size: 13,
+      labelAtDetailLevel: "world",
+    },
+    ruin: {
+      shape: "ruin",
+      fill: "#78716c",
+      stroke: "#292524",
+      size: 6,
+      labelAtDetailLevel: "regional",
+    },
+    regionBoundaries: {
+      town: {
+        stroke: "#a8a29e",
+        weight: 0.75,
+        dashArray: "2 4",
+        showAtDetailLevel: "local",
+      },
+      expanse: {
+        stroke: "#78716c",
+        weight: 1,
+        dashArray: "3 3",
+        showAtDetailLevel: "regional",
+      },
+      "urban-region": {
+        stroke: "#57534e",
+        weight: 1.25,
+        showAtDetailLevel: "regional",
+      },
+      quadrant: {
+        stroke: "#44403c",
+        weight: 1.75,
+        showAtDetailLevel: "regional",
+      },
+      sunder: {
+        stroke: "#292524",
+        weight: 2.5,
+        dashArray: "6 2",
+        showAtDetailLevel: "world",
+      },
+    },
+  },
+  ruins: {
+    overlayPatternId: "ruin-broken",
+    markerStroke: "#57534e",
+    markerFill: "#d6d3d1",
+    clusterBoundaryStroke: "#78716c",
+  },
+  previews: {
+    selection: { borderColor: "#c2410c", borderWeight: 3 },
+    primaryTarget: { borderColor: "#ea580c", borderWeight: 3 },
+    secondaryTarget: { borderColor: "#16a34a", borderWeight: 3 },
+    origin: { borderColor: "#b45309", borderWeight: 3 },
+    candidate: {
+      borderColor: "#64748b",
+      borderWeight: 2,
+      fillColor: "#64748b",
+      fillOpacity: 0.15,
+    },
+    expanded: {
+      borderColor: "#2563eb",
+      borderWeight: 3,
+      fillColor: "#2563eb",
+      fillOpacity: 0.2,
+    },
+    propagationSeed: {
+      borderColor: "#ea580c",
+      borderWeight: 3,
+      fillColor: "#ea580c",
+      fillOpacity: 0.25,
+    },
+    propagationAffected: {
+      borderColor: "#2563eb",
+      borderWeight: 2,
+      fillColor: "#2563eb",
+      fillOpacity: 0.22,
+    },
+    propagationCreated: {
+      borderColor: "#0891b2",
+      borderWeight: 2,
+      fillColor: "#0891b2",
+      fillOpacity: 0.2,
+      dashArray: "6 4",
+    },
+    propagationBlocked: {
+      borderColor: "#dc2626",
+      borderWeight: 2,
+      fillColor: "#dc2626",
+      fillOpacity: 0.18,
+    },
+    consequence: {
+      borderColor: "#7c3aed",
+      borderWeight: 2,
+      fillColor: "#7c3aed",
+      fillOpacity: 0.15,
+    },
+    legend: {
+      selection: "Orange outline: selected tile",
+      primaryTarget: "Warm orange: primary target",
+      secondaryTarget: "Green outline: secondary target",
+      origin: "Amber outline: origin",
+      expanded: "Blue fill: direct target area",
+      propagationAffected: "Light blue: propagated effect",
+      propagationCreated: "Dashed cyan: new tile",
+      propagationBlocked: "Red hatch: blocked",
+      consequence: "Purple: automatic consequence",
+    },
+  },
+  labels: {
+    settlement: { fill: "#292524", stroke: "#fafaf9", fontSize: 11 },
+    region: { fill: "#44403c", stroke: "#fef3c7", fontSize: 12 },
+    route: { fill: "#57534e", stroke: "#fafaf9", fontSize: 10 },
+  },
+  performance: {
+    maxSmoothingIterations: 3,
+    maxPointsPerRegion: 256,
+    minRegionTilesForSmoothing: 2,
+  },
+};

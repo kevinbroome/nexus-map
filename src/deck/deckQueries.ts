@@ -1,5 +1,5 @@
 import type { CardDefinition } from "../cards/cardTypes";
-import { cards } from "../cards/cardDefinitions";
+import { getCardDefinition as lookupCardDefinition } from "../cards/cardRegistry";
 import type { WorldState } from "../world/worldTypes";
 import type { DeckCardInstance, DeckState, EffectiveCardDefinition } from "./deckTypes";
 import { cloneDeckInstance } from "./deckTypes";
@@ -52,7 +52,7 @@ export function getInstancePile(
 }
 
 export function getCardDefinition(definitionId: string): CardDefinition | undefined {
-  return cards.find((entry) => entry.id === definitionId);
+  return lookupCardDefinition(definitionId);
 }
 
 export function getDeckSummary(deck: DeckState): {

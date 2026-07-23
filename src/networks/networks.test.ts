@@ -370,31 +370,16 @@ describe("validation", () => {
 describe("preview and commit", () => {
   const roadCard = cards.find((card) => card.id === "the-road-between")!;
 
-  it("recalculates preview when endpoints change", () => {
+  it("connects to the nearest unconnected settlement from the selected origin", () => {
     let world = createTestWorld("Preview", 5, 1);
     world = withVillage(world, 0, 0);
     world = withVillage(world, 3, 0);
     world = withVillage(world, 4, 0);
 
-    const firstPreview = proposeAction(
-      world,
-      roadCard,
-      [],
-      "seed",
-      roadSelection("0,0", "4,0"),
-    );
-    const secondPreview = proposeAction(
-      world,
-      roadCard,
-      [],
-      "seed",
-      roadSelection("0,0", "3,0"),
-    );
+    const preview = proposeAction(world, roadCard, ["0,0"], "seed");
 
-    expect(firstPreview.valid).toBe(true);
-    expect(secondPreview.valid).toBe(true);
-    expect(firstPreview.proposedRoutes[0]?.pathTileIds.at(-1)).toBe("4,0");
-    expect(secondPreview.proposedRoutes[0]?.pathTileIds.at(-1)).toBe("3,0");
+    expect(preview.valid).toBe(true);
+    expect(preview.proposedRoutes[0]?.pathTileIds.at(-1)).toBe("3,0");
   });
 
   it("disables apply for invalid routes", () => {
@@ -522,7 +507,7 @@ describe("persistence", () => {
 
     const parsed = parseWorld(JSON.stringify(legacy));
 
-    expect(parsed.version).toBe(5);
+    expect(parsed.version).toBe(6);
     expect(parsed.deck.drawPile.length).toBeGreaterThan(0);
     expect(parsed.travelRoutes).toEqual({});
   });

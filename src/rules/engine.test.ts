@@ -395,9 +395,13 @@ describe("engine", () => {
       ...world.tiles["1,1"]!,
       terrain: "water",
     });
+    world.tiles["0,0"] = normalizeMapTile({
+      ...world.tiles["0,0"]!,
+      terrain: "grassland",
+    });
 
-    const card = cards.find((entry) => entry.id === "creeping-wilds")!;
-    const preview = proposeAction(world, card, ["1,1"], "regional-seed");
+    const card = cards.find((entry) => entry.id === "creeping-wilds-ii")!;
+    const preview = proposeAction(world, card, ["0,0"], "regional-seed");
 
     expect(preview.valid).toBe(true);
     expect(preview.cardChanges.some((change) => change.after.terrain === "water")).toBe(

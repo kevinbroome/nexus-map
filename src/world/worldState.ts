@@ -1,9 +1,16 @@
-import { GRID_HEIGHT, GRID_WIDTH } from "../map/mapConfig";
-import { cards } from "../cards/cardDefinitions";
-import { createInitialDeck } from "../deck/createInitialDeck";
+import {
+  DEFAULT_DECK_CONFIGURATION_ID,
+  FIRST_ADVANCED_TEST_DECK,
+} from "../deck/deckConfiguration";
+import {
+  createDeckFromConfiguration,
+  createInitialDeck,
+} from "../deck/createInitialDeck";
+import { getAllCardDefinitions } from "../cards/cardRegistry";
 import { getTileId } from "./coordinates";
 import type { MapTile, WorldState } from "./worldTypes";
 import { normalizeMapTile } from "./tileUtils";
+import { GRID_HEIGHT, GRID_WIDTH } from "../map/mapConfig";
 
 function buildInitialDeckSeed(worldId: string, createdAt: string): string {
   return `initial:${worldId}:${createdAt}`;
@@ -28,15 +35,23 @@ export function createStarterWorld(name: string): WorldState {
     }
   }
 
+  const definitions = getAllCardDefinitions();
+
   return {
-    version: 5,
+    version: 6,
     id,
     name,
     turn: 0,
     tiles,
     settlementRegions: {},
     travelRoutes: {},
-    deck: createInitialDeck(cards, buildInitialDeckSeed(id, now), 0),
+    deck: createDeckFromConfiguration(
+      FIRST_ADVANCED_TEST_DECK.manifest,
+      definitions,
+      buildInitialDeckSeed(id, now),
+      0,
+    ),
+    deckConfigurationId: DEFAULT_DECK_CONFIGURATION_ID,
     history: [],
     createdAt: now,
     updatedAt: now,
@@ -49,6 +64,7 @@ export function createTestWorld(
   height: number,
   originX = 0,
   originY = 0,
+  deckConfigurationId: string | null = null,
 ): WorldState {
   const now = new Date().toISOString();
   const id = "test-world-id";
@@ -68,15 +84,28 @@ export function createTestWorld(
     }
   }
 
+  const definitions = getAllCardDefinitions();
+  const seed = buildInitialDeckSeed(id, now);
+  const deck =
+    deckConfigurationId === DEFAULT_DECK_CONFIGURATION_ID
+      ? createDeckFromConfiguration(
+          FIRST_ADVANCED_TEST_DECK.manifest,
+          definitions,
+          seed,
+          0,
+        )
+      : createInitialDeck(definitions, seed, 0);
+
   return {
-    version: 5,
+    version: 6,
     id,
     name,
     turn: 0,
     tiles,
     settlementRegions: {},
     travelRoutes: {},
-    deck: createInitialDeck(cards, buildInitialDeckSeed(id, now), 0),
+    deck,
+    deckConfigurationId: deckConfigurationId ?? DEFAULT_DECK_CONFIGURATION_ID,
     history: [],
     createdAt: now,
     updatedAt: now,

@@ -9,6 +9,8 @@ import {
   type PropagationHighlightRole,
 } from "./propagationHighlightStyles";
 import { TILE_SIZE } from "./mapConfig";
+import { getTerrainVisualStyle } from "../visuals/theme";
+import { initializeMapTheme } from "../visuals/themeManager";
 
 export type PropagationHighlightState = {
   showFullPath: boolean;
@@ -174,24 +176,8 @@ function resolveTileHighlight(
 }
 
 export function getTerrainColour(terrain: MapTile["terrain"]): string {
-  switch (terrain) {
-    case "water":
-      return "#668fa3";
-    case "grassland":
-      return "#9cab75";
-    case "forest":
-      return "#55735a";
-    case "mountain":
-      return "#827b72";
-    case "urban":
-      return "#a59181";
-    case "chasm":
-      return "#2f2a24";
-    case "desert":
-      return "#c4a574";
-    default:
-      return "#d8d0b8";
-  }
+  const theme = initializeMapTheme();
+  return getTerrainVisualStyle(terrain, theme).baseColor;
 }
 
 export function createTileLayer(

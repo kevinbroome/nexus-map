@@ -119,6 +119,10 @@ export type TargetFilterDefinition =
       tier: SettlementTier | "village" | "ruin";
     }
   | {
+      type: "settlement-region-tier-in";
+      tiers: SettlementTier[];
+    }
+  | {
       type: "adjacent-to-terrain";
       terrain: TerrainType;
       mode?: "cardinal" | "all";

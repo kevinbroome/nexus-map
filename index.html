@@ -59,6 +59,27 @@
           <pre id="deck-summary" class="deck-summary"></pre>
         </section>
 
+        <details id="deck-catalogue" class="deck-catalogue">
+          <summary>Card catalogue</summary>
+          <label for="catalogue-filter">Filter</label>
+          <select id="catalogue-filter">
+            <option value="all">All</option>
+            <option value="creation">Creation</option>
+            <option value="growth">Growth</option>
+            <option value="connection">Connection</option>
+            <option value="transformation">Transformation</option>
+            <option value="destruction">Destruction</option>
+            <option value="recovery">Recovery</option>
+            <option value="expansion">Expansion</option>
+            <option value="deck">Deck mutation</option>
+            <option value="terrain">Terrain</option>
+            <option value="settlement">Settlement</option>
+            <option value="road">Road</option>
+            <option value="propagation">Propagation</option>
+          </select>
+          <pre id="catalogue-content" class="catalogue-content"></pre>
+        </details>
+
         <details id="dev-tools" class="dev-tools-accordion">
           <summary>Developer tools</summary>
           <div class="dev-actions">
@@ -80,6 +101,13 @@
               <option value="existing-road-network">Existing road network</option>
               <option value="negative-coordinate-route">Negative coordinate route</option>
               <option value="already-connected">Already connected settlements</option>
+              <option value="visual-coastline">Visual: coastline and lake</option>
+              <option value="visual-forest-mountain">Visual: forest and mountain</option>
+              <option value="visual-urban-hierarchy">Visual: urban hierarchy</option>
+              <option value="visual-road-network">Visual: road network</option>
+              <option value="visual-ruin-cluster">Visual: ruin cluster</option>
+              <option value="visual-chasm-cut">Visual: chasm through urban</option>
+              <option value="visual-label-collision">Visual: label collision</option>
             </select>
             <button id="dev-load-scenario" type="button">Load dev scenario</button>
             <button id="export-world" type="button">Export JSON</button>
@@ -102,8 +130,16 @@
             <pre id="dev-inspection-targeting" class="dev-inspection-detail"></pre>
             <pre id="dev-inspection-propagation" class="dev-inspection-detail"></pre>
             <pre id="dev-inspection-deck" class="dev-inspection-detail"></pre>
+            <fieldset id="dev-visual-controls" class="dev-visual-controls">
+              <legend>Visual debug</legend>
+            </fieldset>
           </div>
         </details>
+
+        <section id="preview-legend" class="preview-legend" hidden>
+          <h2>Preview legend</h2>
+          <ul id="preview-legend-list"></ul>
+        </section>
 
         <section id="card-panel" hidden>
           <h2 id="card-name"></h2>

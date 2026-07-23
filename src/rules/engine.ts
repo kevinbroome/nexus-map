@@ -17,7 +17,7 @@ import { cloneTile } from "../world/tileUtils";
 import { applyWorldLaws } from "../worldLaws/applyWorldLaws";
 import { formatConsequencePreviewMessages } from "../worldLaws/consequenceMessages";
 import { evaluateConditions } from "./conditions";
-import { applyEffectsToTile } from "./effects";
+import { applyEffectsToTile, applyEmptyUrbanRegionEffect } from "./effects";
 import {
   getPropagatingEffects,
   propagateEffect,
@@ -72,7 +72,11 @@ function applyCardChanges(
 function isDirectEffect(
   effect: CardDefinition["effects"][number],
 ): boolean {
-  return effect.type !== "create-travel-route" && effect.type !== "propagate";
+  return (
+    effect.type !== "create-travel-route" &&
+    effect.type !== "propagate" &&
+    effect.type !== "empty-urban-region"
+  );
 }
 
 function resolveRouteProposal(
@@ -312,6 +316,21 @@ export function proposeAction(
     if (!conditionResult.valid) {
       validationMessages.push(...conditionResult.messages);
       continue;
+    }
+
+    for (const effect of card.effects) {
+      if (effect.type === "empty-urban-region") {
+        Object.assign(
+          modifiedTiles,
+          applyEmptyUrbanRegionEffect(
+            world,
+            tileId,
+            effect,
+            randomSeed,
+            resolvedValues,
+          ),
+        );
+      }
     }
 
     const directEffects = card.effects.filter(isDirectEffect);

@@ -6,6 +6,11 @@ import {
   MAX_MAGNITUDE_REDUCTIONS,
   MAX_RETARGET_DEPTH,
 } from "../../deck/constants";
+import {
+  pickNearestValidTarget,
+  pickRandomValidTarget,
+} from "./autoTarget";
+import { getWorldCentreTileId } from "../targeting/directions";
 import type {
   CardFailure,
   CardResolutionContext,
@@ -304,19 +309,131 @@ export function resolveCardFailureChain(
         break;
       }
 
-      case "nearest-valid-target":
-      case "random-valid-target":
+      case "nearest-valid-target": {
+        const reference =
+          context.selectionTileIds[0] ?? getWorldCentreTileId(context.world);
+        const picked = pickNearestValidTarget(
+          context.world,
+          card,
+          reference,
+          `${context.randomSeed}:nearest:${attempt}`,
+          behaviour.maximumDistance,
+        );
+
+        if (!picked) {
+          attempts.push(
+            recordAttempt(
+              attempt,
+              behaviour,
+              "failed",
+              ["No nearest valid target found."],
+              {},
+            ),
+          );
+          validationMessages.push("No nearest valid target found.");
+          break;
+        }
+
+        resolvedValues.nearestValidTarget = picked;
+        const proposal = proposeAction(
+          context.world,
+          card,
+          [picked],
+          context.randomSeed,
+          context.selection,
+        );
+
+        if (proposal.valid) {
+          attempts.push(
+            recordAttempt(
+              attempt,
+              behaviour,
+              "resolved",
+              ["Nearest valid target succeeded."],
+              resolvedValues,
+            ),
+          );
+          return {
+            resolved: true,
+            finalProposal: proposal,
+            attempts,
+            validationMessages: ["Failure behaviour: nearest valid target succeeded."],
+          };
+        }
+
         attempts.push(
           recordAttempt(
             attempt,
             behaviour,
             "failed",
-            [`${behaviour.type} is not fully implemented yet.`],
-            {},
+            proposal.validationMessages,
+            resolvedValues,
           ),
         );
-        validationMessages.push(`${behaviour.type} is not fully implemented yet.`);
+        validationMessages.push(...proposal.validationMessages);
         break;
+      }
+
+      case "random-valid-target": {
+        const picked = pickRandomValidTarget(
+          context.world,
+          card,
+          `${context.randomSeed}:random:${attempt}`,
+        );
+
+        if (!picked) {
+          attempts.push(
+            recordAttempt(
+              attempt,
+              behaviour,
+              "failed",
+              ["No random valid target found."],
+              {},
+            ),
+          );
+          validationMessages.push("No random valid target found.");
+          break;
+        }
+
+        resolvedValues.randomValidTarget = picked;
+        const proposal = proposeAction(
+          context.world,
+          card,
+          [picked],
+          context.randomSeed,
+          context.selection,
+        );
+
+        if (proposal.valid) {
+          attempts.push(
+            recordAttempt(
+              attempt,
+              behaviour,
+              "resolved",
+              ["Random valid target succeeded."],
+              resolvedValues,
+            ),
+          );
+          return {
+            resolved: true,
+            finalProposal: proposal,
+            attempts,
+            validationMessages: ["Failure behaviour: random valid target succeeded."],
+          };
+        }
+
+        attempts.push(
+          recordAttempt(
+            attempt,
+            behaviour,
+            "failed",
+            proposal.validationMessages,
+            resolvedValues,
+          ),
+        );
+        validationMessages.push(...proposal.validationMessages);
+        break;
+      }
 
       default:
         validationMessages.push(

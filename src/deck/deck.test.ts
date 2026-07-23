@@ -74,7 +74,7 @@ describe("deck creation and persistence", () => {
     const json = serializeWorld(world);
     const loaded = parseWorld(json);
 
-    expect(loaded.version).toBe(5);
+    expect(loaded.version).toBe(6);
     expect(loaded.deck.drawPile.map((entry) => entry.instanceId)).toEqual(
       world.deck.drawPile.map((entry) => entry.instanceId),
     );

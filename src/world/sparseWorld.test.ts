@@ -222,7 +222,7 @@ describe("world migration", () => {
 
     const migrated = parseWorld(JSON.stringify(legacy));
 
-    expect(migrated.version).toBe(5);
+    expect(migrated.version).toBe(6);
     expect(migrated.turn).toBe(1);
     expect(migrated.settlementRegions).toBeDefined();
     expect(migrated.travelRoutes).toEqual({});
