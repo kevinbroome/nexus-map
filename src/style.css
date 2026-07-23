@@ -128,6 +128,24 @@ body {
   margin-top: 0.75rem;
 }
 
+.cloud-auth.cloud-auth--signed-in h2,
+.cloud-auth.cloud-auth--signed-in #auth-user-label,
+.cloud-auth.cloud-auth--signed-in #auth-status-message,
+.cloud-auth.cloud-auth--signed-in label,
+.cloud-auth.cloud-auth--signed-in input,
+.cloud-auth.cloud-auth--signed-in #auth-sign-in,
+.cloud-auth.cloud-auth--signed-in #auth-sign-up {
+  display: none;
+}
+
+.cloud-auth.cloud-auth--signed-in {
+  padding: 0.5rem 0.75rem;
+}
+
+.cloud-auth.cloud-auth--signed-in .cloud-auth-actions {
+  margin-top: 0;
+}
+
 .persistence-status[data-status="cloud-connected"],
 .persistence-status[data-status="cloud-saved"] {
   color: #1d4ed8;
