@@ -2,6 +2,7 @@ import "leaflet/dist/leaflet.css";
 import "./style.css";
 
 import { cardRequiresTwoEndpoints } from "./cards/cardTypes";
+import { loadEnvironment } from "./config/environment";
 import {
   createWorldMap,
   renderWorldMap,
@@ -14,11 +15,14 @@ import {
   exportWorldToFile,
   importWorldFromFile,
 } from "./persistence/worldExport";
+import { createWorldRepository } from "./persistence/repositoryFactory";
 import {
-  clearSavedWorld,
-  loadWorld,
-  saveWorld,
-} from "./persistence/worldStorage";
+  getWorldRepository,
+  setActiveStoredRevision,
+  setWorldRepository,
+} from "./persistence/repositoryContext";
+import { isRepositoryError } from "./persistence/repositoryErrors";
+import type { WorldRepository } from "./persistence/worldRepository";
 import {
   getConsequencePreviewTileIds,
   getPreviewTileIds,
@@ -41,6 +45,17 @@ import {
   createEmptySelection,
   type SelectionMode,
 } from "./selection/selectionTypes";
+import { createSupabaseClient } from "./supabase/client";
+import {
+  formatAuthUserLabel,
+  getAuthSessionState,
+  onAuthStateChanged,
+  signInWithPassword,
+  signOut,
+  signUpWithPassword,
+  type AuthSessionState,
+} from "./supabase/auth";
+import { getCloudDiagnostics, formatCloudDiagnostics } from "./supabase/diagnostics";
 import {
   formatLoadedWorldMessage,
   getSidebarElements,
@@ -48,6 +63,14 @@ import {
   wireDevVisualControls,
   type AppState,
 } from "./ui/sidebar";
+import {
+  getInitialPersistenceStatus,
+  resolveFailedStatus,
+  resolveSavedStatus,
+  resolveSavingStatus,
+  type PersistenceStatus,
+} from "./ui/persistenceStatus";
+import type { AppEnvironment } from "./config/environmentTypes";
 import {
   commitDiscardActiveCard,
   commitDrawCard,
@@ -73,28 +96,49 @@ type StartupResult = {
   loadError: string | null;
 };
 
-function createAndSaveNewWorld(): WorldState {
-  clearSavedWorld();
-
+async function createAndSaveNewWorld(
+  repository: WorldRepository,
+): Promise<WorldState> {
   const world = createStarterWorld("Untitled World");
-  saveWorld(world);
-
-  return world;
+  const stored = await repository.createWorld(world);
+  setActiveStoredRevision(stored.revision);
+  return stored.world;
 }
 
-function initializeWorld(): StartupResult {
-  try {
-    const savedWorld = loadWorld();
+function isCloudPersistenceActive(
+  environment: AppEnvironment,
+  authState: AuthSessionState,
+): boolean {
+  return (
+    environment.repositoryMode === "supabase" &&
+    Boolean(authState.session && environment.supabase)
+  );
+}
 
-    if (savedWorld) {
-      return {
-        world: savedWorld,
-        statusMessage: formatLoadedWorldMessage(savedWorld),
-        loadError: null,
-      };
+async function refreshCloudDiagnostics(environment: AppEnvironment): Promise<string> {
+  const diagnostics = await getCloudDiagnostics(environment);
+  return formatCloudDiagnostics(environment, diagnostics);
+}
+
+async function initializeWorld(repository: WorldRepository): Promise<StartupResult> {
+  try {
+    const worlds = await repository.listWorlds();
+
+    if (worlds.length > 0) {
+      const summary = worlds[0]!;
+      const stored = await repository.loadWorld(summary.id);
+
+      if (stored) {
+        setActiveStoredRevision(stored.revision);
+        return {
+          world: stored.world,
+          statusMessage: formatLoadedWorldMessage(stored.world),
+          loadError: null,
+        };
+      }
     }
 
-    const world = createAndSaveNewWorld();
+    const world = await createAndSaveNewWorld(repository);
 
     return {
       world,
@@ -102,8 +146,9 @@ function initializeWorld(): StartupResult {
       loadError: null,
     };
   } catch (error) {
-    const message =
-      error instanceof Error
+    const message = isRepositoryError(error)
+      ? error.message
+      : error instanceof Error
         ? error.message
         : "The saved world could not be loaded.";
 
@@ -115,7 +160,15 @@ function initializeWorld(): StartupResult {
   }
 }
 
-function createInitialState(startup: StartupResult): AppState {
+function createInitialState(
+  startup: StartupResult,
+  persistenceStatus: PersistenceStatus,
+  cloudDiagnosticsText: string,
+  environment: AppEnvironment,
+  authState: AuthSessionState,
+): AppState {
+  const cloudActive = isCloudPersistenceActive(environment, authState);
+
   const drawnCard = startup.world
     ? resolveEffectiveCardForActiveInstance(startup.world)?.card ?? null
     : null;
@@ -128,6 +181,16 @@ function createInitialState(startup: StartupResult): AppState {
     selectedRouteId: null,
     statusMessage: startup.statusMessage,
     loadError: startup.loadError,
+    persistenceStatus,
+    cloudDiagnosticsText,
+    cloudAuthAvailable: Boolean(environment.supabase),
+    authSignedIn: Boolean(authState.session),
+    authUserLabel: formatAuthUserLabel(authState.user),
+    authMessage: cloudActive
+      ? "Cloud saves are active for this account."
+      : environment.repositoryMode === "supabase"
+        ? "Sign in to load and save worlds in the cloud."
+        : "",
   };
 }
 
@@ -215,12 +278,81 @@ function getDisplayWorld(state: AppState): WorldState | null {
   return state.world;
 }
 
-function bootstrap(): void {
+async function bootstrap(): Promise<void> {
   initializeMapTheme();
+
+  const environment = loadEnvironment();
+  const supabaseClient = createSupabaseClient(environment);
+  let authState = supabaseClient
+    ? await getAuthSessionState(supabaseClient)
+    : { session: null, user: null };
+
+  function configureRepository(): void {
+    setWorldRepository(
+      createWorldRepository(environment, supabaseClient, {
+        cloudEnabled: isCloudPersistenceActive(environment, authState),
+      }),
+    );
+  }
+
+  configureRepository();
+
+  const cloudDiagnosticsText = await refreshCloudDiagnostics(environment);
   const sidebar = getSidebarElements();
-  const startup = initializeWorld();
-  let state = createInitialState(startup);
+  const startup = await initializeWorld(getWorldRepository());
+  let state = createInitialState(
+    startup,
+    getInitialPersistenceStatus(environment, {
+      cloudActive: isCloudPersistenceActive(environment, authState),
+    }),
+    cloudDiagnosticsText,
+    environment,
+    authState,
+  );
   let worldMap: WorldMapView | null = null;
+  const cloudActive = () => isCloudPersistenceActive(environment, authState);
+
+  async function syncAuthState(nextAuthState: AuthSessionState): Promise<void> {
+    authState = nextAuthState;
+    configureRepository();
+    const startupResult = await initializeWorld(getWorldRepository());
+
+    state = {
+      ...state,
+      world: startupResult.world,
+      drawnCard: startupResult.world
+        ? resolveEffectiveCardForActiveInstance(startupResult.world)?.card ?? null
+        : null,
+      proposedAction: null,
+      selectedRouteId: null,
+      selection: createEmptySelection(state.selection.mode),
+      statusMessage: startupResult.statusMessage,
+      loadError: startupResult.loadError,
+      persistenceStatus: getInitialPersistenceStatus(environment, {
+        cloudActive: isCloudPersistenceActive(environment, authState),
+      }),
+      cloudDiagnosticsText: await refreshCloudDiagnostics(environment),
+      authSignedIn: Boolean(authState.session),
+      authUserLabel: formatAuthUserLabel(authState.user),
+      authMessage: isCloudPersistenceActive(environment, authState)
+        ? "Cloud saves are active for this account."
+        : environment.repositoryMode === "supabase"
+          ? "Sign in to load and save worlds in the cloud."
+          : "Signed out. Local saves remain available.",
+    };
+
+    if (startupResult.world && !worldMap) {
+      mountWorldMap(startupResult.world);
+    }
+
+    refresh({ fitMap: Boolean(worldMap && startupResult.world) });
+  }
+
+  if (supabaseClient) {
+    onAuthStateChanged(supabaseClient, (nextAuthState) => {
+      void syncAuthState(nextAuthState);
+    });
+  }
 
   function onTileSelect(tileId: string): void {
     if (!state.world) {
@@ -291,9 +423,15 @@ function bootstrap(): void {
     renderSidebar(sidebar, state);
   }
 
-  sidebar.createNewWorldButton.addEventListener("click", () => {
+  sidebar.createNewWorldButton.addEventListener("click", async () => {
     try {
-      const world = createAndSaveNewWorld();
+      const worlds = await getWorldRepository().listWorlds();
+
+      for (const summary of worlds) {
+        await getWorldRepository().deleteWorld(summary.id);
+      }
+
+      const world = await createAndSaveNewWorld(getWorldRepository());
       const hadMap = Boolean(worldMap);
 
       if (!worldMap) {
@@ -301,6 +439,7 @@ function bootstrap(): void {
       }
 
       state = {
+        ...state,
         world,
         selection: createEmptySelection("single"),
         drawnCard: null,
@@ -308,6 +447,7 @@ function bootstrap(): void {
         selectedRouteId: null,
         statusMessage: "New world created and saved.",
         loadError: null,
+        persistenceStatus: resolveSavedStatus(environment, cloudActive()),
       };
 
       refresh({ fitMap: hadMap });
@@ -320,6 +460,7 @@ function bootstrap(): void {
       state = {
         ...state,
         loadError: message,
+        persistenceStatus: resolveFailedStatus(environment, error, cloudActive()),
       };
     }
 
@@ -351,12 +492,13 @@ function bootstrap(): void {
     });
   }
 
-  sidebar.drawCardButton.addEventListener("click", () => {
-    if (!state.world) {
+  sidebar.drawCardButton.addEventListener("click", async () => {
+    const currentWorld = state.world;
+    if (!currentWorld) {
       return;
     }
 
-    if (state.world.deck.activeInstanceId) {
+    if (currentWorld.deck.activeInstanceId) {
       state = {
         ...state,
         statusMessage: "Discard or play the active card before drawing another.",
@@ -365,8 +507,11 @@ function bootstrap(): void {
       return;
     }
 
+    state = { ...state, persistenceStatus: resolveSavingStatus(environment, cloudActive()) };
+    refresh();
+
     try {
-      const drawResult = commitDrawCard(state.world);
+      const drawResult = await commitDrawCard(currentWorld);
       const active = resolveEffectiveCardForActiveInstance(drawResult.world);
 
       if (!active) {
@@ -388,6 +533,7 @@ function bootstrap(): void {
           ? `Drew "${active.card.name}". Select a route origin, then a destination.`
           : drawResult.message,
         loadError: null,
+        persistenceStatus: resolveSavedStatus(environment, cloudActive()),
       };
       state.proposedAction = buildProposal(state);
       refresh();
@@ -395,24 +541,31 @@ function bootstrap(): void {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "The card could not be drawn.";
-      state = { ...state, statusMessage: message };
+      state = { ...state, statusMessage: message, persistenceStatus: resolveFailedStatus(environment, error, cloudActive()) };
     }
 
     refresh();
   });
 
-  sidebar.applyCardButton.addEventListener("click", () => {
-    if (!state.drawnCard || !state.world || !state.proposedAction) {
+  sidebar.applyCardButton.addEventListener("click", async () => {
+    const currentWorld = state.world;
+    const drawnCard = state.drawnCard;
+    const proposedAction = state.proposedAction;
+
+    if (!drawnCard || !currentWorld || !proposedAction) {
       return;
     }
 
+    state = { ...state, persistenceStatus: resolveSavingStatus(environment, cloudActive()) };
+    refresh();
+
     try {
-      const result = commitWorldAction(
-        state.world,
-        state.drawnCard,
+      const result = await commitWorldAction(
+        currentWorld,
+        drawnCard,
         state.selection.tileIds,
-        state.proposedAction.randomSeed,
-        state.proposedAction,
+        proposedAction.randomSeed,
+        proposedAction,
         state.selection,
       );
 
@@ -424,27 +577,32 @@ function bootstrap(): void {
         selectedRouteId: null,
         statusMessage: result.message,
         loadError: null,
+        persistenceStatus: resolveSavedStatus(environment, cloudActive()),
       };
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : "The action could not be saved. The world was not changed.";
-      state = { ...state, statusMessage: message };
+      state = { ...state, statusMessage: message, persistenceStatus: resolveFailedStatus(environment, error, cloudActive()) };
     }
 
     refresh();
   });
 
-  sidebar.discardCardButton.addEventListener("click", () => {
-    if (!state.world || !state.drawnCard) {
+  sidebar.discardCardButton.addEventListener("click", async () => {
+    const currentWorld = state.world;
+    const drawnCard = state.drawnCard;
+    if (!currentWorld || !drawnCard) {
       return;
     }
 
-    const discardedName = state.drawnCard.name;
+    const discardedName = drawnCard.name;
+    state = { ...state, persistenceStatus: resolveSavingStatus(environment, cloudActive()) };
+    refresh();
 
     try {
-      const result = commitDiscardActiveCard(state.world);
+      const result = await commitDiscardActiveCard(currentWorld);
       state = {
         ...state,
         world: result.world,
@@ -453,22 +611,29 @@ function bootstrap(): void {
         selectedRouteId: null,
         statusMessage: `Discarded "${discardedName}".`,
         loadError: null,
+        persistenceStatus: resolveSavedStatus(environment, cloudActive()),
       };
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "The card could not be discarded.";
-      state = { ...state, statusMessage: message };
+      state = { ...state, statusMessage: message, persistenceStatus: resolveFailedStatus(environment, error, cloudActive()) };
     }
 
     refresh();
   });
 
   if (import.meta.env.DEV) {
-    sidebar.devLoadScenarioButton.addEventListener("click", () => {
+    sidebar.devLoadScenarioButton.addEventListener("click", async () => {
       try {
         const scenarioId = sidebar.devScenarioSelect.value as DevScenarioId;
         const world = createDevScenario(scenarioId);
-        saveWorld(world);
+        const worlds = await getWorldRepository().listWorlds();
+
+        for (const summary of worlds) {
+          await getWorldRepository().deleteWorld(summary.id);
+        }
+
+        await getWorldRepository().createWorld(world);
         const hadMap = Boolean(worldMap);
 
         if (!worldMap) {
@@ -476,6 +641,7 @@ function bootstrap(): void {
         }
 
         state = {
+          ...state,
           world,
           selection: createEmptySelection("single"),
           drawnCard: null,
@@ -483,6 +649,7 @@ function bootstrap(): void {
           selectedRouteId: null,
           statusMessage: `Loaded dev scenario "${scenarioId}".`,
           loadError: null,
+          persistenceStatus: resolveSavedStatus(environment, cloudActive()),
         };
 
         refresh({ fitMap: hadMap });
@@ -492,7 +659,7 @@ function bootstrap(): void {
           error instanceof Error
             ? error.message
             : "The dev scenario could not be loaded.";
-        state = { ...state, statusMessage: message };
+        state = { ...state, statusMessage: message, persistenceStatus: resolveFailedStatus(environment, error, cloudActive()) };
       }
 
       refresh();
@@ -502,14 +669,15 @@ function bootstrap(): void {
     sidebar.devLoadScenarioButton.hidden = true;
   }
 
-  sidebar.devExpandTileButton.addEventListener("click", () => {
-    if (!state.world) {
+  sidebar.devExpandTileButton.addEventListener("click", async () => {
+    const currentWorld = state.world;
+    if (!currentWorld) {
       return;
     }
 
     const selectedTileId = state.selection.tileIds[0];
 
-    if (!selectedTileId || !isBoundaryTile(state.world, selectedTileId)) {
+    if (!selectedTileId || !isBoundaryTile(currentWorld, selectedTileId)) {
       state = {
         ...state,
         statusMessage: "Select a boundary tile with open space beside it.",
@@ -519,7 +687,7 @@ function bootstrap(): void {
     }
 
     const coordinate = getFirstMissingCardinalNeighbour(
-      state.world,
+      currentWorld,
       selectedTileId,
     );
 
@@ -532,8 +700,11 @@ function bootstrap(): void {
       return;
     }
 
+    state = { ...state, persistenceStatus: resolveSavingStatus(environment, cloudActive()) };
+    refresh();
+
     try {
-      const result = commitTileCreation(state.world, coordinate, "empty");
+      const result = await commitTileCreation(currentWorld, coordinate, "empty");
 
       state = {
         ...state,
@@ -543,13 +714,14 @@ function bootstrap(): void {
         selectedRouteId: null,
         statusMessage: result.message,
         loadError: null,
+        persistenceStatus: resolveSavedStatus(environment, cloudActive()),
       };
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : "The action could not be saved. The world was not changed.";
-      state = { ...state, statusMessage: message };
+      state = { ...state, statusMessage: message, persistenceStatus: resolveFailedStatus(environment, error, cloudActive()) };
     }
 
     refresh();
@@ -579,12 +751,23 @@ function bootstrap(): void {
       return;
     }
 
+    state = { ...state, persistenceStatus: resolveSavingStatus(environment, cloudActive()) };
+    refresh();
+
     try {
       const importedWorld = await importWorldFromFile(file);
-      saveWorld(importedWorld);
+      const worlds = await getWorldRepository().listWorlds();
+
+      for (const summary of worlds) {
+        await getWorldRepository().deleteWorld(summary.id);
+      }
+
+      const stored = await getWorldRepository().createWorld(importedWorld);
+      setActiveStoredRevision(stored.revision);
       const hadMap = Boolean(worldMap);
 
       state = {
+        ...state,
         world: importedWorld,
         selection: createEmptySelection(state.selection.mode),
         drawnCard: null,
@@ -592,6 +775,7 @@ function bootstrap(): void {
         selectedRouteId: null,
         statusMessage: `Imported "${importedWorld.name}".`,
         loadError: null,
+        persistenceStatus: resolveSavedStatus(environment, cloudActive()),
       };
 
       if (!worldMap && state.world) {
@@ -604,14 +788,81 @@ function bootstrap(): void {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "The world could not be imported.";
-      state = { ...state, statusMessage: message };
+      state = { ...state, statusMessage: message, persistenceStatus: resolveFailedStatus(environment, error, cloudActive()) };
     }
 
     sidebar.importInput.value = "";
     refresh();
   });
 
+  if (environment.supabase && supabaseClient) {
+    sidebar.authSignInButton.addEventListener("click", async () => {
+      try {
+        state = {
+          ...state,
+          authMessage: "Signing in…",
+        };
+        refresh();
+
+        await signInWithPassword(
+          supabaseClient,
+          sidebar.authEmailInput.value,
+          sidebar.authPasswordInput.value,
+        );
+        sidebar.authPasswordInput.value = "";
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Sign in failed.";
+        state = { ...state, authMessage: message };
+        refresh();
+      }
+    });
+
+    sidebar.authSignUpButton.addEventListener("click", async () => {
+      try {
+        state = {
+          ...state,
+          authMessage: "Creating account…",
+        };
+        refresh();
+
+        const result = await signUpWithPassword(
+          supabaseClient,
+          sidebar.authEmailInput.value,
+          sidebar.authPasswordInput.value,
+        );
+        sidebar.authPasswordInput.value = "";
+
+        state = {
+          ...state,
+          authMessage: result.session
+            ? "Account created and signed in."
+            : "Account created. Check your email if confirmation is required, then sign in.",
+        };
+        refresh();
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Account creation failed.";
+        state = { ...state, authMessage: message };
+        refresh();
+      }
+    });
+
+    sidebar.authSignOutButton.addEventListener("click", async () => {
+      try {
+        await signOut(supabaseClient);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Sign out failed.";
+        state = { ...state, authMessage: message };
+        refresh();
+      }
+    });
+  }
+
   refresh();
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error("Failed to start Nexus Map:", error);
+});

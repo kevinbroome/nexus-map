@@ -3,7 +3,7 @@ import { createInitialDeck, createMigrationDeckSeed } from "../deck/createInitia
 import type { DeckCardInstance } from "../deck/deckTypes";
 import { discardActiveCard, drawCard } from "../deck/deckOperations";
 import { getActiveInstance } from "../deck/deckQueries";
-import { saveWorld } from "../persistence/worldStorage";
+import { persistCommittedWorld } from "../persistence/persistCommittedWorld";
 import { createRandomSeed } from "../rules/random";
 import type { WorldState } from "./worldTypes";
 
@@ -18,10 +18,10 @@ function buildShuffleSeed(world: WorldState): string {
   return `${world.id}:${world.deck.shuffleCount}:${latestActionId}`;
 }
 
-export function commitDrawCard(
+export async function commitDrawCard(
   world: WorldState,
   randomSeed: string = createRandomSeed(),
-): DeckCommitResult {
+): Promise<DeckCommitResult> {
   void randomSeed;
   const drawResult = drawCard(world.deck, buildShuffleSeed(world));
 
@@ -36,9 +36,13 @@ export function commitDrawCard(
   };
 
   try {
-    saveWorld(updatedWorld);
-  } catch {
-    throw new Error("The draw could not be saved. The deck was not changed.");
+    await persistCommittedWorld(updatedWorld, {
+      failureMessage: "The draw could not be saved. The deck was not changed.",
+    });
+  } catch (error) {
+    throw error instanceof Error
+      ? error
+      : new Error("The draw could not be saved. The deck was not changed.");
   }
 
   return {
@@ -48,7 +52,9 @@ export function commitDrawCard(
   };
 }
 
-export function commitDiscardActiveCard(world: WorldState): DeckCommitResult {
+export async function commitDiscardActiveCard(
+  world: WorldState,
+): Promise<DeckCommitResult> {
   if (!world.deck.activeInstanceId) {
     throw new Error("No active card to discard.");
   }
@@ -66,9 +72,13 @@ export function commitDiscardActiveCard(world: WorldState): DeckCommitResult {
   };
 
   try {
-    saveWorld(updatedWorld);
-  } catch {
-    throw new Error("The discard could not be saved. The deck was not changed.");
+    await persistCommittedWorld(updatedWorld, {
+      failureMessage: "The discard could not be saved. The deck was not changed.",
+    });
+  } catch (error) {
+    throw error instanceof Error
+      ? error
+      : new Error("The discard could not be saved. The deck was not changed.");
   }
 
   return {

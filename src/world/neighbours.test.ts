@@ -24,7 +24,7 @@ import { createTile } from "./tileCreation";
 import { normalizeMapTile } from "./tileUtils";
 import { createTestWorld } from "./worldState";
 import type { WorldState } from "./worldTypes";
-import * as worldStorage from "../persistence/worldStorage";
+import * as persistCommittedWorldModule from "../persistence/persistCommittedWorld";
 import { vi } from "vitest";
 
 function createSparseWorld(
@@ -355,8 +355,8 @@ describe("adjacent card targeting compatibility", () => {
 });
 
 describe("connected-region card integration", () => {
-  it("previews and commits the same connected region targets", () => {
-    vi.spyOn(worldStorage, "saveWorld").mockImplementation(() => undefined);
+  it("previews and commits the same connected region targets", async () => {
+    vi.spyOn(persistCommittedWorldModule, "persistCommittedWorld").mockResolvedValue(undefined);
 
     let world = createTestWorld("Test", 4, 4);
 
@@ -375,7 +375,7 @@ describe("connected-region card integration", () => {
 
     const card = cards.find((entry) => entry.id === "wild-consumes-itself")!;
     const preview = proposeAction(world, card, ["1,0"], "region-seed");
-    const committed = commitWorldAction(
+    const committed = await commitWorldAction(
       world,
       card,
       ["1,0"],

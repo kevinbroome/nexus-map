@@ -3,7 +3,7 @@ import { cards } from "../../cards/cardDefinitions";
 import { singlePrimaryTileTarget } from "../../cards/cardTargets";
 import type { CardDefinition } from "../../cards/cardTypes";
 import { parseWorld, serializeWorld } from "../../persistence/worldMigration";
-import * as worldStorage from "../../persistence/worldStorage";
+import * as persistCommittedWorldModule from "../../persistence/persistCommittedWorld";
 import type { TravelRoute } from "../../networks/networkTypes";
 import {
   getPropagationRecords,
@@ -667,15 +667,15 @@ describe("integration", () => {
     expect(preview.propagationResults[0]?.seedTileIds).toEqual(["2,2"]);
   });
 
-  it("preview and commit propagation records match", () => {
-    vi.spyOn(worldStorage, "saveWorld").mockImplementation(() => undefined);
+  it("preview and commit propagation records match", async () => {
+    vi.spyOn(persistCommittedWorldModule, "persistCommittedWorld").mockResolvedValue(undefined);
 
     let world = createTestWorld("Test", 5, 5);
     world = setTerrain(world, 2, 2, "forest");
 
     const card = cards.find((entry) => entry.id === "creeping-wilds-ii")!;
     const preview = proposeAction(world, card, ["2,2"], "commit-seed");
-    const committed = commitWorldAction(
+    const committed = await commitWorldAction(
       world,
       card,
       ["2,2"],
@@ -688,15 +688,15 @@ describe("integration", () => {
     );
   });
 
-  it("export/import preserves propagation records", () => {
-    vi.spyOn(worldStorage, "saveWorld").mockImplementation(() => undefined);
+  it("export/import preserves propagation records", async () => {
+    vi.spyOn(persistCommittedWorldModule, "persistCommittedWorld").mockResolvedValue(undefined);
 
     let world = createTestWorld("Test", 5, 5);
     world = setTerrain(world, 2, 2, "forest");
 
     const card = cards.find((entry) => entry.id === "creeping-wilds-ii")!;
     const preview = proposeAction(world, card, ["2,2"], "export-seed");
-    const committed = commitWorldAction(
+    const committed = await commitWorldAction(
       world,
       card,
       ["2,2"],

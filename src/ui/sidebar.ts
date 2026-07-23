@@ -53,6 +53,11 @@ import {
   getPropagationBlockedTileIds,
   getPropagationCreatedTileIds,
 } from "../rules/engine";
+import {
+  formatPersistenceStatus,
+  persistenceStatusToDataset,
+  type PersistenceStatus,
+} from "./persistenceStatus";
 
 export type AppState = {
   world: WorldState | null;
@@ -62,6 +67,12 @@ export type AppState = {
   selectedRouteId: string | null;
   statusMessage: string;
   loadError: string | null;
+  persistenceStatus: PersistenceStatus;
+  cloudDiagnosticsText: string;
+  cloudAuthAvailable: boolean;
+  authSignedIn: boolean;
+  authUserLabel: string;
+  authMessage: string;
 };
 
 export type SidebarElements = {
@@ -99,6 +110,16 @@ export type SidebarElements = {
   devVisualControls: HTMLFieldSetElement;
   previewLegend: HTMLElement;
   previewLegendList: HTMLUListElement;
+  persistenceStatus: HTMLParagraphElement;
+  cloudDiagnostics: HTMLPreElement;
+  cloudAuthPanel: HTMLElement;
+  authUserLabel: HTMLParagraphElement;
+  authStatusMessage: HTMLParagraphElement;
+  authEmailInput: HTMLInputElement;
+  authPasswordInput: HTMLInputElement;
+  authSignInButton: HTMLButtonElement;
+  authSignUpButton: HTMLButtonElement;
+  authSignOutButton: HTMLButtonElement;
 };
 
 export function getSidebarElements(): SidebarElements {
@@ -178,6 +199,28 @@ export function getSidebarElements(): SidebarElements {
   const previewLegendList = document.querySelector<HTMLUListElement>(
     "#preview-legend-list",
   );
+  const persistenceStatus = document.querySelector<HTMLParagraphElement>(
+    "#persistence-status",
+  );
+  const cloudDiagnostics = document.querySelector<HTMLPreElement>(
+    "#cloud-diagnostics",
+  );
+  const cloudAuthPanel = document.querySelector<HTMLElement>("#cloud-auth");
+  const authUserLabel = document.querySelector<HTMLParagraphElement>(
+    "#auth-user-label",
+  );
+  const authStatusMessage = document.querySelector<HTMLParagraphElement>(
+    "#auth-status-message",
+  );
+  const authEmailInput = document.querySelector<HTMLInputElement>("#auth-email");
+  const authPasswordInput =
+    document.querySelector<HTMLInputElement>("#auth-password");
+  const authSignInButton =
+    document.querySelector<HTMLButtonElement>("#auth-sign-in");
+  const authSignUpButton =
+    document.querySelector<HTMLButtonElement>("#auth-sign-up");
+  const authSignOutButton =
+    document.querySelector<HTMLButtonElement>("#auth-sign-out");
 
   if (
     !selectedLocation ||
@@ -213,7 +256,17 @@ export function getSidebarElements(): SidebarElements {
     !devInspectionDeck ||
     !devVisualControls ||
     !previewLegend ||
-    !previewLegendList
+    !previewLegendList ||
+    !persistenceStatus ||
+    !cloudDiagnostics ||
+    !cloudAuthPanel ||
+    !authUserLabel ||
+    !authStatusMessage ||
+    !authEmailInput ||
+    !authPasswordInput ||
+    !authSignInButton ||
+    !authSignUpButton ||
+    !authSignOutButton
   ) {
     throw new Error("Sidebar elements are missing from the page.");
   }
@@ -253,6 +306,16 @@ export function getSidebarElements(): SidebarElements {
     devVisualControls,
     previewLegend,
     previewLegendList,
+    persistenceStatus,
+    cloudDiagnostics,
+    cloudAuthPanel,
+    authUserLabel,
+    authStatusMessage,
+    authEmailInput,
+    authPasswordInput,
+    authSignInButton,
+    authSignUpButton,
+    authSignOutButton,
   };
 }
 
@@ -652,6 +715,26 @@ export function renderSidebar(
   }
   elements.statusMessage.textContent = state.loadError ?? state.statusMessage;
   elements.statusMessage.dataset.error = state.loadError ? "true" : "false";
+  elements.persistenceStatus.textContent = formatPersistenceStatus(
+    state.persistenceStatus,
+  );
+  elements.persistenceStatus.dataset.status = persistenceStatusToDataset(
+    state.persistenceStatus,
+  );
+  elements.cloudDiagnostics.textContent = import.meta.env.DEV
+    ? state.cloudDiagnosticsText
+    : "";
+  elements.cloudDiagnostics.hidden = !import.meta.env.DEV;
+  elements.cloudAuthPanel.hidden = !state.cloudAuthAvailable;
+  elements.authUserLabel.textContent = state.authSignedIn
+    ? `Signed in as ${state.authUserLabel}`
+    : "";
+  elements.authStatusMessage.textContent = state.authMessage;
+  elements.authSignOutButton.hidden = !state.authSignedIn;
+  elements.authSignInButton.hidden = state.authSignedIn;
+  elements.authSignUpButton.hidden = state.authSignedIn;
+  elements.authEmailInput.disabled = state.authSignedIn;
+  elements.authPasswordInput.disabled = state.authSignedIn;
   elements.recoveryPanel.hidden = state.loadError === null;
 
   elements.drawCardButton.disabled =

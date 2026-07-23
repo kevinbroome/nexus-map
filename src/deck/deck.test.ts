@@ -322,17 +322,17 @@ describe("failure behaviours", () => {
 });
 
 describe("commit integration", () => {
-  it("persists draw and discard outside world actions", () => {
+  it("persists draw and discard outside world actions", async () => {
     let world = createTestWorld("Persist", 3, 3);
-    world = commitDrawCard(world).world;
+    world = (await commitDrawCard(world)).world;
     expect(getActiveInstance(world.deck)).toBeTruthy();
 
-    world = commitDiscardActiveCard(world).world;
+    world = (await commitDiscardActiveCard(world)).world;
     expect(world.deck.activeInstanceId).toBeUndefined();
     expect(world.history).toHaveLength(0);
   });
 
-  it("stores deck mutations and card instance on successful commit", () => {
+  it("stores deck mutations and card instance on successful commit", async () => {
     let world = ensureActiveCardForDefinition(
       createTestWorld("Commit", 4, 4),
       "wild-growth",
@@ -355,7 +355,7 @@ describe("commit integration", () => {
     }
 
     const proposal = proposeCardPlay(world, ["1,1"], "commit-seed");
-    const result = commitWorldAction(
+    const result = await commitWorldAction(
       world,
       card,
       ["1,1"],

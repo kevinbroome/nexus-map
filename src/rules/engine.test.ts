@@ -19,7 +19,7 @@ import { createSeededRandom, pickRandomItems } from "./random";
 import { buildTargetResolutionContext, resolveCardTargets } from "./targets";
 import { resolveTargets } from "./targeting/resolveTargets";
 import { commitWorldAction } from "../world/commitWorldAction";
-import * as worldStorage from "../persistence/worldStorage";
+import * as persistCommittedWorldModule from "../persistence/persistCommittedWorld";
 import { parseWorld, serializeWorld } from "../persistence/worldMigration";
 
 function createCard(overrides: Partial<CardDefinition> = {}): CardDefinition {
@@ -326,13 +326,13 @@ describe("effects", () => {
 });
 
 describe("engine", () => {
-  it("matches preview and committed results", () => {
-    vi.spyOn(worldStorage, "saveWorld").mockImplementation(() => undefined);
+  it("matches preview and committed results", async () => {
+    vi.spyOn(persistCommittedWorldModule, "persistCommittedWorld").mockResolvedValue(undefined);
 
     const world = createTestWorld("Test", 3, 3);
     const card = cards.find((entry) => entry.id === "wild-growth")!;
     const preview = proposeAction(world, card, ["1,1"], "fixed-seed");
-    const committed = commitWorldAction(
+    const committed = await commitWorldAction(
       world,
       card,
       ["1,1"],
@@ -371,13 +371,13 @@ describe("engine", () => {
     expect(first.resolvedValues).not.toEqual({});
   });
 
-  it("creates exactly one history action per commit", () => {
-    vi.spyOn(worldStorage, "saveWorld").mockImplementation(() => undefined);
+  it("creates exactly one history action per commit", async () => {
+    vi.spyOn(persistCommittedWorldModule, "persistCommittedWorld").mockResolvedValue(undefined);
 
     const world = createTestWorld("Test", 2, 2);
     const card = cards.find((entry) => entry.id === "waters-rise")!;
     const preview = proposeAction(world, card, ["0,0"], "seed-a");
-    const committed = commitWorldAction(
+    const committed = await commitWorldAction(
       world,
       card,
       ["0,0"],
@@ -429,8 +429,8 @@ describe("engine", () => {
     );
   });
 
-  it("preserves target resolution through export and import", () => {
-    vi.spyOn(worldStorage, "saveWorld").mockImplementation(() => undefined);
+  it("preserves target resolution through export and import", async () => {
+    vi.spyOn(persistCommittedWorldModule, "persistCommittedWorld").mockResolvedValue(undefined);
 
     const world = createTestWorld("Test", 3, 3);
     const card = cards.find((entry) => entry.id === "new-foundations")!;
@@ -440,7 +440,7 @@ describe("engine", () => {
     });
 
     const preview = proposeAction(world, card, ["1,1"], "export-seed");
-    const committed = commitWorldAction(
+    const committed = await commitWorldAction(
       world,
       card,
       ["1,1"],

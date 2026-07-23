@@ -15,7 +15,7 @@ import { ensureActiveCardForDefinition } from "../deck/deckQueries";
 import type { PropagationRecord } from "../rules/propagation/types";
 import type { TargetResolutionRecord } from "../rules/targeting/types";
 import type { SelectionState } from "../selection/selectionTypes";
-import { saveWorld } from "../persistence/worldStorage";
+import { persistCommittedWorld } from "../persistence/persistCommittedWorld";
 import { formatConsequencesSummary } from "../worldLaws/consequenceMessages";
 import type { WorldAction, WorldState } from "./worldTypes";
 
@@ -74,10 +74,10 @@ export function formatCommitMessage(action: WorldAction): string {
   return lines.join("\n");
 }
 
-function commitDiscardOnlyFailure(
+async function commitDiscardOnlyFailure(
   world: WorldState,
   expectedProposal: ProposedAction,
-): CommitResult {
+): Promise<CommitResult> {
   if (
     expectedProposal.failureResolution?.finalDisposition !== "discard" ||
     !expectedProposal.deckChange
@@ -92,9 +92,13 @@ function commitDiscardOnlyFailure(
   };
 
   try {
-    saveWorld(updatedWorld);
-  } catch {
-    throw new Error("The discard could not be saved. The world was not changed.");
+    await persistCommittedWorld(updatedWorld, {
+      failureMessage: "The discard could not be saved. The world was not changed.",
+    });
+  } catch (error) {
+    throw error instanceof Error
+      ? error
+      : new Error("The discard could not be saved. The world was not changed.");
   }
 
   return {
@@ -103,14 +107,14 @@ function commitDiscardOnlyFailure(
   };
 }
 
-export function commitWorldAction(
+export async function commitWorldAction(
   world: WorldState,
   card: CardDefinition,
   selectionTileIds: string[],
   randomSeed?: string,
   expectedProposal?: ReturnType<typeof proposeCardPlay>,
   selection?: SelectionState,
-): CommitResult {
+): Promise<CommitResult> {
   const preparedWorld = ensureActiveCardForDefinition(world, card.id);
   const proposal = finalizeProposalForCommit(
     preparedWorld,
@@ -155,7 +159,7 @@ export function commitWorldAction(
       );
     }
 
-    return commitDiscardOnlyFailure(world, proposal);
+    return await commitDiscardOnlyFailure(world, proposal);
   }
 
   if (!proposal.valid || !proposal.resultingWorld || !proposal.deckChange) {
@@ -259,9 +263,13 @@ export function commitWorldAction(
   };
 
   try {
-    saveWorld(updatedWorld);
-  } catch {
-    throw new Error("The action could not be saved. The world was not changed.");
+    await persistCommittedWorld(updatedWorld, {
+      failureMessage: "The action could not be saved. The world was not changed.",
+    });
+  } catch (error) {
+    throw error instanceof Error
+      ? error
+      : new Error("The action could not be saved. The world was not changed.");
   }
 
   return {

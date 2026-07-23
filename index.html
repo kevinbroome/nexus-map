@@ -15,6 +15,24 @@
         <h1>Nexus Map</h1>
         <p id="selected-location">No location selected</p>
         <p id="status-message"></p>
+        <p id="persistence-status" class="persistence-status" data-status="local-idle">
+          Local save
+        </p>
+
+        <section id="cloud-auth" class="cloud-auth" hidden>
+          <h2>Cloud account</h2>
+          <p id="auth-user-label"></p>
+          <p id="auth-status-message"></p>
+          <label for="auth-email">Email</label>
+          <input id="auth-email" type="email" autocomplete="username" />
+          <label for="auth-password">Password</label>
+          <input id="auth-password" type="password" autocomplete="current-password" />
+          <div class="cloud-auth-actions">
+            <button id="auth-sign-in" type="button">Sign in</button>
+            <button id="auth-sign-up" type="button">Create account</button>
+            <button id="auth-sign-out" type="button" hidden>Sign out</button>
+          </div>
+        </section>
 
         <section id="recovery-panel" hidden>
           <p id="recovery-message">
@@ -147,6 +165,7 @@
             <fieldset id="dev-visual-controls" class="dev-visual-controls">
               <legend>Visual debug</legend>
             </fieldset>
+            <pre id="cloud-diagnostics" class="cloud-diagnostics"></pre>
           </div>
         </details>
       </aside>

@@ -1,6 +1,6 @@
 import { createTile } from "./tileCreation";
 import { getTileId } from "./coordinates";
-import { saveWorld } from "../persistence/worldStorage";
+import { persistCommittedWorld } from "../persistence/persistCommittedWorld";
 import type { TerrainType, WorldAction, WorldState } from "./worldTypes";
 import { cloneTile } from "./tileUtils";
 import {
@@ -13,11 +13,11 @@ function getNextSequence(world: WorldState): number {
   return getLatestActionSequence(world) + 1;
 }
 
-export function commitTileCreation(
+export async function commitTileCreation(
   world: WorldState,
   coordinate: { x: number; y: number },
   terrain: TerrainType = "empty",
-): CommitResult {
+): Promise<CommitResult> {
   const updatedWorld = createTile(world, coordinate, terrain);
   const tileId = getTileId(coordinate.x, coordinate.y);
   const after = updatedWorld.tiles[tileId];
@@ -73,9 +73,13 @@ export function commitTileCreation(
   };
 
   try {
-    saveWorld(committedWorld);
-  } catch {
-    throw new Error("The action could not be saved. The world was not changed.");
+    await persistCommittedWorld(committedWorld, {
+      failureMessage: "The action could not be saved. The world was not changed.",
+    });
+  } catch (error) {
+    throw error instanceof Error
+      ? error
+      : new Error("The action could not be saved. The world was not changed.");
   }
 
   return {

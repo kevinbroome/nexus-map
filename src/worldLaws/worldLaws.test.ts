@@ -8,7 +8,7 @@ import {
 } from "../world/tileUtils";
 import { proposeAction } from "../rules/engine";
 import { commitWorldAction } from "../world/commitWorldAction";
-import * as worldStorage from "../persistence/worldStorage";
+import * as persistCommittedWorldModule from "../persistence/persistCommittedWorld";
 import { parseWorld, serializeWorld } from "../persistence/worldMigration";
 import { applyWorldLaws } from "./applyWorldLaws";
 import { groupConnectedUnits } from "./groupConnectedUnits";
@@ -61,13 +61,15 @@ function lineVillages(world: WorldState, count: number, y = 0): WorldState {
 }
 
 describe("turn behaviour", () => {
-  it("increments the turn once per committed card", () => {
+  it("increments the turn once per committed card", async () => {
     const world = addVillage(createTestWorld("Turn", 3, 3), 1, 1);
     const card = cards.find((entry) => entry.id === "wild-growth")!;
     const proposal = proposeAction(world, card, ["1,1"], "seed-turn");
-    const saveSpy = vi.spyOn(worldStorage, "saveWorld").mockImplementation(() => {});
+    const saveSpy = vi
+      .spyOn(persistCommittedWorldModule, "persistCommittedWorld")
+      .mockResolvedValue(undefined);
 
-    const result = commitWorldAction(
+    const result = await commitWorldAction(
       world,
       card,
       ["1,1"],
@@ -111,17 +113,17 @@ describe("turn behaviour", () => {
     expect(proposal.nextTurn).toBe(0);
   });
 
-  it("does not increment the turn when persistence fails", () => {
+  it("does not increment the turn when persistence fails", async () => {
     const world = addVillage(createTestWorld("Turn", 3, 3), 1, 1, 0, "grassland");
     const card = cards.find((entry) => entry.id === "wild-growth")!;
     const proposal = proposeAction(world, card, ["1,1"], "seed-save");
-    vi.spyOn(worldStorage, "saveWorld").mockImplementation(() => {
-      throw new Error("save failed");
-    });
+    vi.spyOn(persistCommittedWorldModule, "persistCommittedWorld").mockRejectedValue(
+      new Error("save failed"),
+    );
 
-    expect(() =>
+    await expect(
       commitWorldAction(world, card, ["1,1"], proposal.randomSeed, proposal),
-    ).toThrow();
+    ).rejects.toThrow();
     expect(world.turn).toBe(0);
   });
 });
@@ -313,7 +315,7 @@ describe("ruin groups", () => {
 });
 
 describe("preview and commit", () => {
-  it("includes automatic consequences in preview and commit", () => {
+  it("includes automatic consequences in preview and commit", async () => {
     let world = lineVillages(createTestWorld("Preview", 5, 3), 2);
     world = {
       ...world,
@@ -327,8 +329,10 @@ describe("preview and commit", () => {
       true,
     );
 
-    const saveSpy = vi.spyOn(worldStorage, "saveWorld").mockImplementation(() => {});
-    const committed = commitWorldAction(
+    const saveSpy = vi
+      .spyOn(persistCommittedWorldModule, "persistCommittedWorld")
+      .mockResolvedValue(undefined);
+    const committed = await commitWorldAction(
       world,
       card,
       ["2,0"],

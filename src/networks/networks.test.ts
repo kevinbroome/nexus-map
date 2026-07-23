@@ -29,7 +29,8 @@ import {
 } from "./routeCreation";
 import { createTravelRouteId } from "./routeId";
 import { validateTravelRoute } from "./routeValidation";
-import * as worldStorage from "../persistence/worldStorage";
+import * as persistCommittedWorldModule from "../persistence/persistCommittedWorld";
+import { PersistenceUnavailableError } from "../persistence/repositoryErrors";
 
 function setTerrain(
   world: WorldState,
@@ -399,7 +400,7 @@ describe("preview and commit", () => {
     expect(preview.valid).toBe(false);
   });
 
-  it("commits the same path that was previewed", () => {
+  it("commits the same path that was previewed", async () => {
     let world = createTestWorld("Commit path", 5, 1);
     world = withVillage(world, 0, 0);
     world = withVillage(world, 4, 0);
@@ -411,8 +412,10 @@ describe("preview and commit", () => {
       "seed",
       roadSelection("0,0", "4,0"),
     );
-    const saveSpy = vi.spyOn(worldStorage, "saveWorld").mockImplementation(() => {});
-    const committed = commitWorldAction(
+    const saveSpy = vi
+      .spyOn(persistCommittedWorldModule, "persistCommittedWorld")
+      .mockResolvedValue(undefined);
+    const committed = await commitWorldAction(
       world,
       roadCard,
       [],
@@ -430,7 +433,7 @@ describe("preview and commit", () => {
     saveSpy.mockRestore();
   });
 
-  it("increments the turn once and records one history action", () => {
+  it("increments the turn once and records one history action", async () => {
     let world = createTestWorld("Turn", 5, 1);
     world = withVillage(world, 0, 0);
     world = withVillage(world, 4, 0);
@@ -442,8 +445,10 @@ describe("preview and commit", () => {
       "seed",
       roadSelection("0,0", "4,0"),
     );
-    const saveSpy = vi.spyOn(worldStorage, "saveWorld").mockImplementation(() => {});
-    const committed = commitWorldAction(
+    const saveSpy = vi
+      .spyOn(persistCommittedWorldModule, "persistCommittedWorld")
+      .mockResolvedValue(undefined);
+    const committed = await commitWorldAction(
       world,
       roadCard,
       [],
@@ -458,7 +463,7 @@ describe("preview and commit", () => {
     saveSpy.mockRestore();
   });
 
-  it("leaves the world unchanged when persistence fails", () => {
+  it("leaves the world unchanged when persistence fails", async () => {
     let world = createTestWorld("Save fail", 5, 1);
     world = withVillage(world, 0, 0);
     world = withVillage(world, 4, 0);
@@ -470,11 +475,11 @@ describe("preview and commit", () => {
       "seed",
       roadSelection("0,0", "4,0"),
     );
-    vi.spyOn(worldStorage, "saveWorld").mockImplementation(() => {
-      throw new Error("save failed");
-    });
+    vi.spyOn(persistCommittedWorldModule, "persistCommittedWorld").mockRejectedValue(
+      new PersistenceUnavailableError("save failed"),
+    );
 
-    expect(() =>
+    await expect(
       commitWorldAction(
         world,
         roadCard,
@@ -483,7 +488,7 @@ describe("preview and commit", () => {
         preview,
         roadSelection("0,0", "4,0"),
       ),
-    ).toThrow(/could not be saved/i);
+    ).rejects.toThrow();
     expect(world.turn).toBe(0);
     expect(Object.keys(world.travelRoutes)).toHaveLength(0);
   });

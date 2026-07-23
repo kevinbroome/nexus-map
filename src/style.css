@@ -66,6 +66,83 @@ body {
   font-weight: 600;
 }
 
+.persistence-status {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: #57534e;
+}
+
+.persistence-status[data-status="local-saving"] {
+  color: #92400e;
+}
+
+.persistence-status[data-status="local-saved"] {
+  color: #166534;
+}
+
+.persistence-status[data-status="local-failed"] {
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.cloud-diagnostics {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+}
+
+.cloud-auth {
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  border: 1px solid #dbeafe;
+  border-radius: 0.5rem;
+  background: #eff6ff;
+}
+
+.cloud-auth h2 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.cloud-auth label {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.cloud-auth input {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  box-sizing: border-box;
+}
+
+.cloud-auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.persistence-status[data-status="cloud-connected"],
+.persistence-status[data-status="cloud-saved"] {
+  color: #1d4ed8;
+}
+
+.persistence-status[data-status="cloud-saving"] {
+  color: #92400e;
+}
+
+.persistence-status[data-status="auth-required"],
+.persistence-status[data-status="conflict"] {
+  color: #991b1b;
+  font-weight: 600;
+}
+
 #recovery-panel {
   margin: 0 0 1rem;
   padding: 0.75rem;
