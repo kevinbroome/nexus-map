@@ -40,12 +40,9 @@ import {
 import { createRandomSeed } from "./rules/random";
 import {
   handleTileSelection,
-  setSelectionMode,
+  createSelectionForCard,
 } from "./selection/selection";
-import {
-  createEmptySelection,
-  type SelectionMode,
-} from "./selection/selectionTypes";
+import { createEmptySelection } from "./selection/selectionTypes";
 import { createSupabaseClient } from "./supabase/client";
 import {
   formatAuthUserLabel,
@@ -176,7 +173,7 @@ function createInitialState(
 
   return {
     world: startup.world,
-    selection: createEmptySelection("single"),
+    selection: createSelectionForCard(drawnCard),
     drawnCard,
     proposedAction: null,
     selectedRouteId: null,
@@ -352,7 +349,12 @@ async function bootstrap(): Promise<void> {
         : null,
       proposedAction: null,
       selectedRouteId: null,
-      selection: createEmptySelection(state.selection.mode),
+      selection: createSelectionForCard(
+        startupResult.world
+          ? resolveEffectiveCardForActiveInstance(startupResult.world)?.card ??
+              null
+          : null,
+      ),
       statusMessage: startupResult.statusMessage,
       loadError: startupResult.loadError,
       persistenceStatus: getInitialPersistenceStatus(environment, {
@@ -498,27 +500,6 @@ async function bootstrap(): Promise<void> {
     refresh();
   });
 
-  for (const input of sidebar.selectionModeInputs) {
-    input.addEventListener("change", () => {
-      if (!input.checked || !state.world) {
-        return;
-      }
-
-      state = {
-        ...state,
-        selection: setSelectionMode(
-          state.selection,
-          input.value as SelectionMode,
-        ),
-        proposedAction: null,
-        selectedRouteId: null,
-        statusMessage: `Selection mode: ${input.labels?.[0]?.textContent?.trim() ?? input.value}.`,
-      };
-      state.proposedAction = buildProposal(state);
-      refresh();
-    });
-  }
-
   sidebar.drawCardButton.addEventListener("click", async () => {
     const currentWorld = state.world;
     if (!currentWorld) {
@@ -545,15 +526,11 @@ async function bootstrap(): Promise<void> {
         throw new Error("The drawn card could not be resolved.");
       }
 
-      const selectionMode = cardRequiresTwoEndpoints(active.card)
-        ? "two-endpoints"
-        : state.selection.mode;
-
       state = {
         ...state,
         world: drawResult.world,
         drawnCard: active.card,
-        selection: createEmptySelection(selectionMode),
+        selection: createSelectionForCard(active.card),
         proposedAction: null,
         selectedRouteId: null,
         statusMessage: cardRequiresTwoEndpoints(active.card)
@@ -602,6 +579,7 @@ async function bootstrap(): Promise<void> {
         drawnCard: null,
         proposedAction: null,
         selectedRouteId: null,
+        selection: createSelectionForCard(null),
         statusMessage: result.message,
         loadError: null,
         persistenceStatus: resolveSavedStatus(environment, cloudActive()),
@@ -636,6 +614,7 @@ async function bootstrap(): Promise<void> {
         drawnCard: null,
         proposedAction: null,
         selectedRouteId: null,
+        selection: createSelectionForCard(null),
         statusMessage: `Discarded "${discardedName}".`,
         loadError: null,
         persistenceStatus: resolveSavedStatus(environment, cloudActive()),
@@ -796,7 +775,7 @@ async function bootstrap(): Promise<void> {
       state = {
         ...state,
         world: importedWorld,
-        selection: createEmptySelection(state.selection.mode),
+        selection: createSelectionForCard(null),
         drawnCard: null,
         proposedAction: null,
         selectedRouteId: null,

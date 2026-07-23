@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { crossroadsTarget, twoEndpointRouteTarget } from "../cards/cardTargets";
+import { cardRequiresTwoEndpoints } from "../cards/cardTypes";
 import { createTestWorld } from "../world/worldState";
 import {
+  createSelectionForCard,
   handleTileSelection,
   setSelectionMode,
 } from "./selection";
@@ -8,6 +11,63 @@ import { createEmptySelection } from "./selectionTypes";
 
 describe("selection", () => {
   const world = createTestWorld("Test", 4, 4);
+
+  it("defaults to single-tile selection for normal cards", () => {
+    expect(createSelectionForCard(null).mode).toBe("single");
+    expect(
+      createSelectionForCard({
+        id: "test",
+        name: "Test",
+        description: "",
+        rulesText: "",
+        category: "creation",
+        tags: [],
+        target: crossroadsTarget(),
+        conditions: [],
+        effects: [],
+      }).mode,
+    ).toBe("single");
+  });
+
+  it("switches to route endpoints only for secondary-selection cards", () => {
+    expect(
+      cardRequiresTwoEndpoints({
+        id: "dev-road",
+        name: "Dev Road",
+        description: "",
+        rulesText: "",
+        category: "connection",
+        tags: [],
+        target: twoEndpointRouteTarget(["tile"]),
+        conditions: [],
+        effects: [],
+      }),
+    ).toBe(true);
+    expect(
+      createSelectionForCard({
+        id: "dev-road",
+        name: "Dev Road",
+        description: "",
+        rulesText: "",
+        category: "connection",
+        tags: [],
+        target: twoEndpointRouteTarget(["tile"]),
+        conditions: [],
+        effects: [],
+      }).mode,
+    ).toBe("two-endpoints");
+    expect(cardRequiresTwoEndpoints({
+      id: "crossroads",
+      name: "Crossroads",
+      description: "",
+      rulesText: "",
+      category: "connection",
+      tags: [],
+      target: crossroadsTarget(),
+      conditions: [],
+      effects: [],
+    })).toBe(false);
+  });
 
   it("selects a single tile in single mode", () => {
     const selection = handleTileSelection(

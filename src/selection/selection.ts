@@ -1,11 +1,23 @@
 import { getTileId, parseTileId } from "../world/coordinates";
 import type { WorldState } from "../world/worldTypes";
 import {
+  cardRequiresTwoEndpoints,
+  type CardDefinition,
+} from "../cards/cardTypes";
+import {
   createEmptySelection,
   getRouteEndpointTileIds,
   type SelectionMode,
   type SelectionState,
 } from "./selectionTypes";
+
+export function createSelectionForCard(
+  card: CardDefinition | null | undefined,
+): SelectionState {
+  const mode =
+    card && cardRequiresTwoEndpoints(card) ? "two-endpoints" : "single";
+  return createEmptySelection(mode);
+}
 
 function areTilesAdjacent(firstId: string, secondId: string): boolean {
   const first = parseTileId(firstId);

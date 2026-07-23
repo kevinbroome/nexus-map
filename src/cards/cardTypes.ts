@@ -161,7 +161,7 @@ export function createInvalidProposal(
 export type { DeckCardInstance, DeckState, DeckMutationDefinition, ProposedDeckChange };
 
 export function cardRequiresTwoEndpoints(card: CardDefinition): boolean {
-  return card.target.destination !== undefined;
+  return card.target.destination?.type === "secondary-selection";
 }
 
 export function toTargetResolutionRecord(
