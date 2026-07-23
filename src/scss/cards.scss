@@ -1,0 +1,113 @@
+@use "variables" as *;
+@use "mixins" as *;
+
+#card-panel {
+  margin: 0 0 1rem;
+  padding: $space-panel;
+  border: 1px solid $color-border;
+  border-radius: $radius-panel;
+  background: #fff;
+}
+
+#card-description {
+  margin: 0 0 0.75rem;
+}
+
+#card-validation {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  white-space: pre-line;
+
+  &[data-valid="true"] {
+    color: $color-success;
+  }
+
+  &[data-valid="false"] {
+    color: $color-error;
+  }
+}
+
+.card-actions {
+  display: grid;
+  gap: 0.5rem;
+
+  button {
+    @include panel-button;
+
+    &:disabled {
+      @include disabled-control;
+    }
+  }
+}
+
+.preview-legend {
+  margin: 0 0 1rem;
+  padding: $space-panel;
+  border: 1px solid #d6d3d1;
+  border-radius: $radius-panel;
+  background: #fff;
+
+  h2 {
+    font-size: 0.95rem;
+    margin: 0 0 0.5rem;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.85rem;
+  }
+}
+
+#deck-panel {
+  margin: 0 0 1rem;
+  padding: $space-panel;
+  border: 1px solid $color-border;
+  border-radius: $radius-panel;
+  background: #fff;
+
+  h2 {
+    margin-top: 0;
+  }
+}
+
+.deck-summary,
+.catalogue-content {
+  margin: 0;
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  white-space: pre-line;
+  color: $color-text;
+}
+
+.deck-catalogue {
+  margin: 0 0 1rem;
+  padding: $space-panel;
+  border: 1px solid $color-border;
+  border-radius: $radius-panel;
+  background: #fff;
+
+  summary {
+    cursor: pointer;
+    font-weight: 700;
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+  }
+
+  label {
+    display: block;
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  select {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    box-sizing: border-box;
+  }
+}

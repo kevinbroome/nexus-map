@@ -1,5 +1,5 @@
 import "leaflet/dist/leaflet.css";
-import "./style.css";
+import "./scss/main.scss";
 
 import { cardRequiresTwoEndpoints } from "./cards/cardTypes";
 import { loadEnvironment } from "./config/environment";
