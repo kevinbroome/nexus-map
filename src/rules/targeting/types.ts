@@ -141,6 +141,12 @@ export type TargetFilterDefinition =
       minimum?: number;
       maximum?: number;
       metric?: "manhattan" | "chebyshev";
+    }
+  | {
+      type: "distance-from-world-centre";
+      minimum?: number;
+      maximum?: number;
+      metric?: "manhattan" | "chebyshev";
     };
 
 export type TargetOrderingDefinition =

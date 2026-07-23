@@ -339,3 +339,49 @@ export const forgottenInstructionTarget = (): TargetDefinition => ({
   selection: { type: "first" },
   expansion: { type: "none" },
 });
+
+export const playerNearCentreTarget = (
+  filters: TargetFilterDefinition[] = [],
+): TargetDefinition => ({
+  origin: { type: "primary-selection" },
+  search: { type: "origin-only" },
+  filters: [
+    { type: "distance-from-world-centre", maximum: 2, metric: "manhattan" },
+    ...filters,
+  ],
+  selection: { type: "first" },
+  expansion: { type: "none" },
+});
+
+export const playerWildlandTarget = (
+  terrains: TerrainType[] = ["empty", "grassland", "desert"],
+): TargetDefinition => ({
+  origin: { type: "primary-selection" },
+  search: { type: "origin-only" },
+  filters: [{ type: "terrain-in", terrains }],
+  selection: { type: "first" },
+  expansion: { type: "none" },
+});
+
+export const forestGrasslandPlayerTarget = (): TargetDefinition => ({
+  origin: { type: "primary-selection" },
+  search: { type: "origin-only" },
+  filters: [{ type: "terrain-in", terrains: ["forest", "grassland"] }],
+  selection: { type: "first" },
+  expansion: { type: "none" },
+});
+
+export const waterSpreadTarget = (): TargetDefinition => ({
+  origin: { type: "world-centre" },
+  search: { type: "origin-only" },
+  selection: { type: "first" },
+  expansion: { type: "none" },
+});
+
+export const waterRiverPlayerTarget = (): TargetDefinition => ({
+  origin: { type: "primary-selection" },
+  search: { type: "origin-only" },
+  filters: [{ type: "terrain-is", terrain: "water" }],
+  selection: { type: "first" },
+  expansion: { type: "none" },
+});

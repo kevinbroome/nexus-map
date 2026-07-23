@@ -5,6 +5,7 @@ import type { DeckCardInstance, DeckState } from "./deckTypes";
 import { cloneDeckState } from "./deckTypes";
 import { createDeckInstanceId, validateUniqueInstanceIds } from "./instanceIds";
 import { FIRST_ADVANCED_TEST_DECK } from "./deckConfiguration";
+import { applyOpeningDrawGuarantees } from "./openingDeckStack";
 
 function shuffleInstances(
   instances: DeckCardInstance[],
@@ -66,7 +67,11 @@ export function createDeckFromConfiguration(
   }
 
   return {
-    drawPile: shuffleInstances(instances, seed),
+    drawPile: applyOpeningDrawGuarantees(
+      shuffleInstances(instances, seed),
+      definitions,
+      `${seed}:opening`,
+    ),
     discardPile: [],
     retiredPile: [],
     activeInstanceId: undefined,
