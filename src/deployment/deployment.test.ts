@@ -86,14 +86,18 @@ describe("GitHub Pages deployment", () => {
       indexHtml = readDistIndexHtml();
     } catch {
       // The production build is verified in GitHub Actions (Build step).
-      // Locally, run `npm run build` with GITHUB_PAGES_BUILD=true first.
+      // Locally, run `npm run verify:pages-build` to check Pages asset paths.
+      return;
+    }
+
+    if (!indexHtml.includes("/nexus-map/assets/")) {
+      // A local root-base build (`npm run build`) also writes dist/.
       return;
     }
 
     const assetDirectory = join(projectRoot, "dist", "assets");
     const assetFiles = readdirSync(assetDirectory);
 
-    expect(indexHtml).toContain("/nexus-map/assets/");
     expect(
       assetFiles.some((fileName) =>
         indexHtml.includes(`/nexus-map/assets/${fileName}`),
