@@ -1,4 +1,5 @@
 import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
+import { getAuthenticationRedirectUrl } from "../config/applicationUrl";
 import {
   AuthenticationRequiredError,
   PersistenceUnavailableError,
@@ -59,6 +60,9 @@ export async function signUpWithPassword(
   const { data, error } = await client.auth.signUp({
     email: email.trim(),
     password,
+    options: {
+      emailRedirectTo: getAuthenticationRedirectUrl(),
+    },
   });
 
   if (error) {
@@ -69,6 +73,22 @@ export async function signUpWithPassword(
     session: data.session,
     user: data.session?.user ?? data.user,
   };
+}
+
+export async function resetPasswordForEmail(
+  client: SupabaseClient,
+  email: string,
+): Promise<void> {
+  const { error } = await client.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: getAuthenticationRedirectUrl(),
+  });
+
+  if (error) {
+    throw new UnknownRepositoryError(
+      "Password reset email could not be sent.",
+      { cause: error },
+    );
+  }
 }
 
 export async function signOut(client: SupabaseClient): Promise<void> {

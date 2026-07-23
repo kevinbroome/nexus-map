@@ -3,6 +3,7 @@ import "./style.css";
 
 import { cardRequiresTwoEndpoints } from "./cards/cardTypes";
 import { loadEnvironment } from "./config/environment";
+import { RepositoryConfigurationError } from "./persistence/repositoryErrors";
 import {
   createWorldMap,
   renderWorldMap,
@@ -281,7 +282,33 @@ function getDisplayWorld(state: AppState): WorldState | null {
 async function bootstrap(): Promise<void> {
   initializeMapTheme();
 
-  const environment = loadEnvironment();
+  let environment: AppEnvironment;
+  try {
+    environment = loadEnvironment();
+  } catch (error) {
+    const message =
+      error instanceof RepositoryConfigurationError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : "The application configuration is invalid.";
+
+    if (import.meta.env.PROD) {
+      const app = document.getElementById("app");
+      if (app) {
+        app.innerHTML = `
+          <section class="configuration-error">
+            <h1>Configuration error</h1>
+            <p>${message}</p>
+          </section>
+        `;
+      }
+      return;
+    }
+
+    throw error;
+  }
+
   const supabaseClient = createSupabaseClient(environment);
   let authState = supabaseClient
     ? await getAuthSessionState(supabaseClient)

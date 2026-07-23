@@ -1,5 +1,6 @@
 import type { AppEnvironment } from "../config/environmentTypes";
 import { describeEnvironment } from "../config/environment";
+import { describeDeploymentDiagnostics } from "../config/deploymentDiagnostics";
 import { createSupabaseClient, getSupabaseClient } from "./client";
 import { formatAuthUserLabel } from "./auth";
 
@@ -43,8 +44,14 @@ export function formatCloudDiagnostics(
   environment: AppEnvironment,
   diagnostics: CloudDiagnostics,
 ): string {
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : undefined;
+  const environmentLines = import.meta.env.DEV
+    ? describeDeploymentDiagnostics(environment, origin)
+    : describeEnvironment(environment);
+
   return [
-    ...describeEnvironment(environment),
+    ...environmentLines,
     `Supabase client: ${diagnostics.supabaseClient}`,
     `Authenticated user: ${diagnostics.authenticatedUser}`,
     `Cloud world repository: ${diagnostics.cloudWorldRepository}`,

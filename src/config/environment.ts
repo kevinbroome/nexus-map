@@ -111,7 +111,9 @@ export function loadEnvironment(): AppEnvironment {
 }
 
 export function describeEnvironment(environment: AppEnvironment): string[] {
-  const lines = [`Repository mode: ${environment.repositoryMode}`];
+  const lines = [
+    `Repository mode: ${environment.repositoryMode === "supabase" ? "Supabase" : "Local"}`,
+  ];
 
   if (environment.supabase) {
     lines.push("Supabase configuration: Present");
