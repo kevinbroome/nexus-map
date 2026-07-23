@@ -40,7 +40,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          GITHUB_ACTIONS: "true"
+          GITHUB_PAGES_BUILD: "true"
           GITHUB_REPOSITORY: ${{ github.repository }}
           VITE_WORLD_REPOSITORY: supabase
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}

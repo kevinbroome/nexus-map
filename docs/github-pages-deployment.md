@@ -102,7 +102,7 @@ Production build env:
 - `VITE_WORLD_REPOSITORY=supabase`
 - `VITE_SUPABASE_URL` from repository variables
 - `VITE_SUPABASE_PUBLISHABLE_KEY` from repository secrets
-- `GITHUB_ACTIONS=true` and `GITHUB_REPOSITORY` for the correct asset base path
+- `GITHUB_PAGES_BUILD=true` and `GITHUB_REPOSITORY` for the correct asset base path
 
 ## Local development
 
@@ -114,7 +114,7 @@ npm run dev
 
 Use `.env.local` for local Supabase credentials. Set `VITE_WORLD_REPOSITORY=local` to keep browser saves in localStorage, or `supabase` plus sign-in to test cloud mode locally.
 
-`npm run build` without `GITHUB_ACTIONS=true` produces a root-base (`/`) build suitable for local preview:
+`npm run build` without `GITHUB_PAGES_BUILD=true` produces a root-base (`/`) build suitable for local preview:
 
 ```bash
 npm run build

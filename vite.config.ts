@@ -3,7 +3,7 @@ import { resolveViteBasePath } from "./src/config/viteBasePath";
 
 export default defineConfig({
   base: resolveViteBasePath({
-    githubActions: process.env.GITHUB_ACTIONS,
+    githubPagesBuild: process.env.GITHUB_PAGES_BUILD,
     githubRepository: process.env.GITHUB_REPOSITORY,
   }),
   test: {

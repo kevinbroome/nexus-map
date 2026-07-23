@@ -72,7 +72,7 @@ describe("GitHub Pages deployment", () => {
       stdio: "pipe",
       env: {
         ...process.env,
-        GITHUB_ACTIONS: "true",
+        GITHUB_PAGES_BUILD: "true",
         GITHUB_REPOSITORY: "kevinbroome/nexus-map",
         VITE_WORLD_REPOSITORY: "supabase",
         VITE_SUPABASE_URL: "https://example.supabase.co",
@@ -85,7 +85,7 @@ describe("GitHub Pages deployment", () => {
     const assetFiles = readdirSync(assetDirectory);
 
     expect(resolveViteBasePath({
-      githubActions: "true",
+      githubPagesBuild: "true",
       githubRepository: "kevinbroome/nexus-map",
     })).toBe("/nexus-map/");
     expect(indexHtml).toContain("/nexus-map/assets/");

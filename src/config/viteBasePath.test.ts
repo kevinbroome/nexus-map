@@ -6,16 +6,24 @@ describe("resolveViteBasePath", () => {
     expect(resolveViteBasePath()).toBe("/");
     expect(
       resolveViteBasePath({
-        githubActions: "false",
+        githubPagesBuild: "false",
         githubRepository: "owner/repo",
       }),
     ).toBe("/");
   });
 
-  it("uses /repository-name/ for GitHub Actions project Pages sites", () => {
+  it("ignores GITHUB_REPOSITORY unless GITHUB_PAGES_BUILD is true", () => {
     expect(
       resolveViteBasePath({
-        githubActions: "true",
+        githubRepository: "kevinbroome/nexus-map",
+      }),
+    ).toBe("/");
+  });
+
+  it("uses /repository-name/ for GitHub Pages production builds", () => {
+    expect(
+      resolveViteBasePath({
+        githubPagesBuild: "true",
         githubRepository: "kevinbroome/nexus-map",
       }),
     ).toBe("/nexus-map/");
@@ -24,7 +32,7 @@ describe("resolveViteBasePath", () => {
   it("uses / for user Pages repositories named owner.github.io", () => {
     expect(
       resolveViteBasePath({
-        githubActions: "true",
+        githubPagesBuild: "true",
         githubRepository: "kevinbroome/kevinbroome.github.io",
       }),
     ).toBe("/");
