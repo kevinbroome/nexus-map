@@ -122,10 +122,6 @@ export function applySeedFallback(
 ): PropagationResult {
   const workingWorld = cloneWorldTiles(world);
   const tileCount = fallback.tileCount ?? 1;
-  const anchorId =
-    fallback.anchor === "primary-selection" && context.seedTileIds[0]
-      ? context.seedTileIds[0]
-      : getWorldCentreTileId(world);
 
   let hostIds =
     fallback.anchor === "primary-selection" && context.seedTileIds[0]
