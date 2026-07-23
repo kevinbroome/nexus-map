@@ -3,6 +3,13 @@ import type {
   RouteChange,
   TravelNodeType,
 } from "../networks/networkTypes";
+import type { DeckCardInstance } from "../deck/deckTypes";
+import type { DeckMutationDefinition, DeckState, ProposedDeckChange } from "../deck/deckTypes";
+import type {
+  FailureBehaviourDefinition,
+  FailureResolutionResult,
+  FailureStage,
+} from "../rules/failure/failureTypes";
 import type { PropagationRecord, PropagationResult } from "../rules/propagation/types";
 import type { PropagatingEffectDefinition } from "../rules/propagation/types";
 import type {
@@ -60,10 +67,16 @@ export interface CardDefinition {
   target: TargetDefinition;
   conditions: ConditionDefinition[];
   effects: EffectDefinition[];
+  initialCopies?: number;
+  deckMutations?: DeckMutationDefinition[];
+  failureBehaviours?: Partial<Record<FailureStage, FailureBehaviourDefinition>>;
+  defaultFailureBehaviour?: FailureBehaviourDefinition;
 }
 
 export interface ProposedAction {
   cardId: string;
+  cardInstanceId?: string;
+  effectiveCardSummary?: Record<string, unknown>;
   targetIds: string[];
   valid: boolean;
   validationMessages: string[];
@@ -75,6 +88,8 @@ export interface ProposedAction {
   proposedRoutes: ProposedTravelRoute[];
   targetResolution: TargetResolutionResult | null;
   propagationResults: PropagationResult[];
+  deckChange?: ProposedDeckChange;
+  failureResolution?: FailureResolutionResult;
   nextTurn: number;
   resultingWorld: WorldState | null;
   randomSeed: string;
@@ -107,6 +122,8 @@ export function createInvalidProposal(
     resolvedValues: targetResolution?.resolvedValues ?? {},
   };
 }
+
+export type { DeckCardInstance, DeckState, DeckMutationDefinition, ProposedDeckChange };
 
 export function cardRequiresTwoEndpoints(card: CardDefinition): boolean {
   return card.target.destination !== undefined;

@@ -31,6 +31,10 @@ export function commitTileCreation(
     sequence: getNextSequence(world),
     cardId: "dev-create-tile",
     cardName: "Create tile",
+    cardInstanceId: "",
+    effectiveCardDefinitionSummary: {},
+    failureAttempts: [],
+    deckMutations: [],
     targetIds: [tileId],
     targetResolution: {
       originIds: [tileId],

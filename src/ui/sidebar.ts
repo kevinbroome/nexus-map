@@ -14,6 +14,13 @@ import {
   getPrimarySelectedTileId,
 } from "../selection/selection";
 import { formatProposalMessage } from "../rules/engine";
+import { canCommitProposal } from "../rules/proposeCardPlay";
+import {
+  formatInstanceLabel,
+  getActiveInstance,
+  getCardDefinition,
+  getDeckSummary,
+} from "../deck/deckQueries";
 import {
   describePropagationDefinition,
   describePropagationResult,
@@ -60,6 +67,7 @@ export type SidebarElements = {
   cardValidation: HTMLParagraphElement;
   applyCardButton: HTMLButtonElement;
   discardCardButton: HTMLButtonElement;
+  deckSummary: HTMLPreElement;
   devInspectionCardinal: HTMLParagraphElement;
   devInspectionAll: HTMLParagraphElement;
   devInspectionRegion: HTMLParagraphElement;
@@ -68,6 +76,7 @@ export type SidebarElements = {
   devInspectionRouteDetail: HTMLPreElement;
   devInspectionTargeting: HTMLPreElement;
   devInspectionPropagation: HTMLPreElement;
+  devInspectionDeck: HTMLPreElement;
 };
 
 export function getSidebarElements(): SidebarElements {
@@ -110,6 +119,7 @@ export function getSidebarElements(): SidebarElements {
     document.querySelector<HTMLButtonElement>("#apply-card");
   const discardCardButton =
     document.querySelector<HTMLButtonElement>("#discard-card");
+  const deckSummary = document.querySelector<HTMLPreElement>("#deck-summary");
   const devInspectionCardinal = document.querySelector<HTMLParagraphElement>(
     "#dev-inspection-cardinal",
   );
@@ -134,6 +144,9 @@ export function getSidebarElements(): SidebarElements {
   const devInspectionPropagation = document.querySelector<HTMLPreElement>(
     "#dev-inspection-propagation",
   );
+  const devInspectionDeck = document.querySelector<HTMLPreElement>(
+    "#dev-inspection-deck",
+  );
 
   if (
     !selectedLocation ||
@@ -156,6 +169,7 @@ export function getSidebarElements(): SidebarElements {
     !cardValidation ||
     !applyCardButton ||
     !discardCardButton ||
+    !deckSummary ||
     !devInspectionCardinal ||
     !devInspectionAll ||
     !devInspectionRegion ||
@@ -163,7 +177,8 @@ export function getSidebarElements(): SidebarElements {
     !devInspectionSettlementDetail ||
     !devInspectionRouteDetail ||
     !devInspectionTargeting ||
-    !devInspectionPropagation
+    !devInspectionPropagation ||
+    !devInspectionDeck
   ) {
     throw new Error("Sidebar elements are missing from the page.");
   }
@@ -189,6 +204,7 @@ export function getSidebarElements(): SidebarElements {
     cardValidation,
     applyCardButton,
     discardCardButton,
+    deckSummary,
     devInspectionCardinal,
     devInspectionAll,
     devInspectionRegion,
@@ -197,6 +213,7 @@ export function getSidebarElements(): SidebarElements {
     devInspectionRouteDetail,
     devInspectionTargeting,
     devInspectionPropagation,
+    devInspectionDeck,
   };
 }
 
@@ -391,6 +408,90 @@ function formatPropagationInspection(
   return lines.join("\n\n");
 }
 
+function formatDeckSummary(world: WorldState): string {
+  const summary = getDeckSummary(world.deck);
+  const lines = [
+    `Draw pile: ${summary.drawCount}`,
+    `Discard pile: ${summary.discardCount}`,
+    `Retired: ${summary.retiredCount}`,
+    `Active: ${summary.activeName ?? "none"}`,
+    `Shuffles: ${summary.shuffleCount}`,
+  ];
+
+  const active = getActiveInstance(world.deck);
+
+  if (active) {
+    const definition = getCardDefinition(active.definitionId);
+    lines.push(
+      "",
+      "Active instance:",
+      `Name: ${formatInstanceLabel(active, definition)}`,
+      `Instance ID: ${active.instanceId}`,
+      `Definition: ${active.definitionId}`,
+      `Modifications: ${active.modifications.length}`,
+      `Created turn: ${active.createdTurn}`,
+      `Created by action: ${active.createdByActionId ?? "initial deck"}`,
+      `Tags: ${active.tags.join(", ") || "none"}`,
+      `Pile: active`,
+    );
+  }
+
+  return lines.join("\n");
+}
+
+function formatDevDeckPiles(world: WorldState): string {
+  const formatPile = (label: string, pile: typeof world.deck.drawPile) => {
+    if (pile.length === 0) {
+      return `${label}: empty`;
+    }
+
+    return [
+      `${label}:`,
+      ...pile.map((instance) => {
+        const definition = getCardDefinition(instance.definitionId);
+        return `- ${formatInstanceLabel(instance, definition)}`;
+      }),
+    ].join("\n");
+  };
+
+  return [
+    formatPile("Draw pile cards", world.deck.drawPile),
+    formatPile("Discard pile cards", world.deck.discardPile),
+    formatPile("Retired pile cards", world.deck.retiredPile),
+  ].join("\n\n");
+}
+
+function formatFailureInspection(proposal: ProposedAction | null): string {
+  if (!proposal?.failureResolution) {
+    return "";
+  }
+
+  const lines = ["Failure resolution:"];
+
+  for (const attempt of proposal.failureResolution.attempts) {
+    lines.push(
+      `Attempt ${attempt.attempt}: ${attempt.behaviourType} → ${attempt.result}`,
+      ...attempt.messages.map((message) => `  ${message}`),
+    );
+  }
+
+  return lines.join("\n");
+}
+
+function formatDeckChangeInspection(proposal: ProposedAction | null): string {
+  if (!proposal?.deckChange) {
+    return "";
+  }
+
+  const lines = ["Deck changes:"];
+
+  for (const mutation of proposal.deckChange.mutations) {
+    lines.push(`- ${mutation.type}`);
+  }
+
+  return lines.join("\n");
+}
+
 export function renderSidebar(
   elements: SidebarElements,
   state: AppState,
@@ -399,7 +500,9 @@ export function renderSidebar(
   const proposalMessage = state.proposedAction
     ? formatProposalMessage(state.proposedAction)
     : "";
-  const canApply = state.proposedAction?.valid ?? false;
+  const canApply = state.proposedAction
+    ? canCommitProposal(state.proposedAction)
+    : false;
 
   elements.selectedLocation.textContent = state.world
     ? formatSelection(state.world, state.selection)
@@ -407,13 +510,21 @@ export function renderSidebar(
   elements.worldSummary.textContent = state.world
     ? formatSettlementSummary(getSettlementSummary(state.world))
     : "";
+  elements.deckSummary.textContent = state.world
+    ? formatDeckSummary(state.world)
+    : "";
+  elements.devInspectionDeck.textContent =
+    import.meta.env.DEV && state.world ? formatDevDeckPiles(state.world) : "";
   elements.statusMessage.textContent = state.loadError ?? state.statusMessage;
   elements.statusMessage.dataset.error = state.loadError ? "true" : "false";
   elements.recoveryPanel.hidden = state.loadError === null;
 
-  elements.drawCardButton.disabled = interactionsDisabled;
-  elements.drawRoadCardButton.disabled = interactionsDisabled;
-  elements.discardCardButton.disabled = interactionsDisabled;
+  elements.drawCardButton.disabled =
+    interactionsDisabled || Boolean(state.world?.deck.activeInstanceId);
+  elements.drawRoadCardButton.disabled =
+    interactionsDisabled || Boolean(state.world?.deck.activeInstanceId);
+  elements.discardCardButton.disabled =
+    interactionsDisabled || !state.drawnCard;
   elements.exportButton.disabled = interactionsDisabled;
   elements.importButton.disabled = interactionsDisabled;
   elements.devScenarioSelect.disabled = interactionsDisabled;
@@ -498,7 +609,32 @@ export function renderSidebar(
     elements.cardPanel.hidden = false;
     elements.cardName.textContent = state.drawnCard.name;
     elements.cardDescription.textContent = state.drawnCard.description;
-    elements.cardValidation.textContent = proposalMessage;
+
+    const active = getActiveInstance(state.world.deck);
+    const baseDefinition = active
+      ? getCardDefinition(active.definitionId)
+      : undefined;
+    const modificationLines =
+      active && active.modifications.length > 0
+        ? [
+            "",
+            `Base: ${baseDefinition?.name ?? active.definitionId}`,
+            ...active.modifications.map(
+              (modification) => `Modification: ${modification.type}`,
+            ),
+            `Effective: ${state.drawnCard.name}`,
+          ]
+        : [];
+
+    const extraLines = [
+      ...modificationLines,
+      formatFailureInspection(state.proposedAction),
+      formatDeckChangeInspection(state.proposedAction),
+    ].filter(Boolean);
+
+    elements.cardValidation.textContent = [proposalMessage, ...extraLines]
+      .filter(Boolean)
+      .join("\n\n");
     elements.cardValidation.dataset.valid = canApply ? "true" : "false";
     elements.applyCardButton.disabled = !canApply;
   } else {

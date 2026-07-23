@@ -1,12 +1,17 @@
-import type { CardDefinition } from "../cards/cardTypes";
+import type { CardDefinition, ProposedAction } from "../cards/cardTypes";
 import { toPropagationRecord, toTargetResolutionRecord } from "../cards/cardTypes";
 import {
   formatProposalMessage,
   getPropagationRecords,
   getTargetResolutionRecord,
-  proposeAction,
   proposalsAreEqual,
 } from "../rules/engine";
+import {
+  canCommitProposal,
+  finalizeProposalForCommit,
+  proposeCardPlay,
+} from "../rules/proposeCardPlay";
+import { ensureActiveCardForDefinition } from "../deck/deckQueries";
 import type { PropagationRecord } from "../rules/propagation/types";
 import type { TargetResolutionRecord } from "../rules/targeting/types";
 import type { SelectionState } from "../selection/selectionTypes";
@@ -40,9 +45,16 @@ function propagationRecordsMatch(
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function deckChangesMatch(
+  left: ProposedAction["deckChange"],
+  right: ProposedAction["deckChange"],
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 export type CommitResult = {
   world: WorldState;
-  action: WorldAction;
+  action?: WorldAction;
   message: string;
 };
 
@@ -62,34 +74,96 @@ export function formatCommitMessage(action: WorldAction): string {
   return lines.join("\n");
 }
 
+function commitDiscardOnlyFailure(
+  world: WorldState,
+  expectedProposal: ProposedAction,
+): CommitResult {
+  if (
+    expectedProposal.failureResolution?.finalDisposition !== "discard" ||
+    !expectedProposal.deckChange
+  ) {
+    throw new Error("This proposal cannot be committed as a discard-only failure.");
+  }
+
+  const updatedWorld: WorldState = {
+    ...world,
+    deck: cloneValue(expectedProposal.deckChange.after),
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    saveWorld(updatedWorld);
+  } catch {
+    throw new Error("The discard could not be saved. The world was not changed.");
+  }
+
+  return {
+    world: updatedWorld,
+    message: "Failure behaviour discarded the active card without changing the world.",
+  };
+}
+
 export function commitWorldAction(
   world: WorldState,
   card: CardDefinition,
   selectionTileIds: string[],
   randomSeed?: string,
-  expectedProposal?: ReturnType<typeof proposeAction>,
+  expectedProposal?: ReturnType<typeof proposeCardPlay>,
   selection?: SelectionState,
 ): CommitResult {
-  const proposal = proposeAction(
-    world,
+  const preparedWorld = ensureActiveCardForDefinition(world, card.id);
+  const proposal = finalizeProposalForCommit(
+    preparedWorld,
     card,
     selectionTileIds,
     randomSeed,
+    expectedProposal,
     selection,
   );
 
-  if (!proposal.valid || !proposal.resultingWorld) {
+  if (!canCommitProposal(proposal)) {
     throw new Error(formatProposalMessage(proposal));
   }
 
-  if (expectedProposal && !proposalsAreEqual(proposal, expectedProposal)) {
+  const expectedFinal = expectedProposal
+    ? finalizeProposalForCommit(
+        preparedWorld,
+        card,
+        selectionTileIds,
+        randomSeed,
+        expectedProposal,
+        selection,
+      )
+    : null;
+
+  if (expectedFinal && !proposalsAreEqual(proposal, expectedFinal)) {
     throw new Error(
       "The preview no longer matches the current world. Select the card again.",
     );
   }
 
-  const expectedRecord = expectedProposal
-    ? getTargetResolutionRecord(expectedProposal)
+  if (
+    proposal.failureResolution?.finalDisposition === "discard" &&
+    !proposal.valid
+  ) {
+    if (
+      expectedFinal &&
+      !deckChangesMatch(proposal.deckChange, expectedFinal.deckChange)
+    ) {
+      throw new Error(
+        "Deck changes changed between preview and commit. Draw the card again.",
+      );
+    }
+
+    return commitDiscardOnlyFailure(world, proposal);
+  }
+
+  if (!proposal.valid || !proposal.resultingWorld || !proposal.deckChange) {
+    throw new Error(formatProposalMessage(proposal));
+  }
+
+  const expectedRecord = expectedFinal
+    ? getTargetResolutionRecord(expectedFinal)
     : null;
   const commitRecord = getTargetResolutionRecord(proposal);
 
@@ -103,8 +177,8 @@ export function commitWorldAction(
     );
   }
 
-  const expectedPropagation = expectedProposal
-    ? getPropagationRecords(expectedProposal)
+  const expectedPropagation = expectedFinal
+    ? getPropagationRecords(expectedFinal)
     : null;
   const commitPropagation = getPropagationRecords(proposal);
 
@@ -114,6 +188,15 @@ export function commitWorldAction(
   ) {
     throw new Error(
       "Propagation changed between preview and commit. Select the card again.",
+    );
+  }
+
+  if (
+    expectedFinal &&
+    !deckChangesMatch(proposal.deckChange, expectedFinal.deckChange)
+  ) {
+    throw new Error(
+      "Deck changes changed between preview and commit. Draw the card again.",
     );
   }
 
@@ -149,6 +232,12 @@ export function commitWorldAction(
     sequence: getNextSequence(world),
     cardId: card.id,
     cardName: card.name,
+    cardInstanceId: proposal.cardInstanceId ?? "",
+    effectiveCardDefinitionSummary: cloneValue(
+      proposal.effectiveCardSummary ?? {},
+    ),
+    failureAttempts: cloneValue(proposal.failureResolution?.attempts ?? []),
+    deckMutations: cloneValue(proposal.deckChange.mutations),
     targetIds: [...proposal.targetIds],
     targetResolution,
     propagationRecords,
@@ -164,6 +253,7 @@ export function commitWorldAction(
 
   const updatedWorld: WorldState = {
     ...proposal.resultingWorld,
+    deck: cloneValue(proposal.deckChange.after),
     history: [...world.history, action],
     updatedAt: new Date().toISOString(),
   };

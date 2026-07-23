@@ -47,6 +47,18 @@ export const twoEndpointRouteTarget = (
   ...(allowedNodeTypes.length > 0 ? {} : {}),
 });
 
+export const exactDistanceTarget = (distance: number): TargetDefinition => ({
+  origin: { type: "primary-selection" },
+  search: {
+    type: "exact-distance",
+    distance: { type: "fixed", value: distance },
+    metric: "manhattan",
+  },
+  filters: [{ type: "tile-exists" }],
+  selection: { type: "random-one" },
+  expansion: { type: "none" },
+});
+
 export const distantFoundationsTarget = (): TargetDefinition => ({
   origin: { type: "primary-selection" },
   search: {

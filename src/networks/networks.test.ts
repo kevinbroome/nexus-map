@@ -522,7 +522,8 @@ describe("persistence", () => {
 
     const parsed = parseWorld(JSON.stringify(legacy));
 
-    expect(parsed.version).toBe(4);
+    expect(parsed.version).toBe(5);
+    expect(parsed.deck.drawPile.length).toBeGreaterThan(0);
     expect(parsed.travelRoutes).toEqual({});
   });
 

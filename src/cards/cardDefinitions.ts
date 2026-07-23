@@ -3,6 +3,7 @@ import {
   adjacentPrimaryTarget,
   connectedRegionTarget,
   distantFoundationsTarget,
+  exactDistanceTarget,
   edgeOfTheKnownTarget,
   marchOfStoneTarget,
   nearestRoadTarget,
@@ -197,5 +198,105 @@ export const cards: CardDefinition[] = [
     target: ashWalkTarget(),
     conditions: [],
     effects: [ashWalkEffect()],
+  },
+  {
+    id: "the-last-flood",
+    name: "The Last Flood",
+    description:
+      "Spread water like The Flood Comes, then retire this card after a successful play.",
+    target: theFloodComesTarget(),
+    conditions: [{ type: "terrain-is", terrain: "water" }],
+    effects: [theFloodComesEffect()],
+    deckMutations: [{ type: "retire-self" }],
+    failureBehaviours: {
+      propagation: { type: "reduce-magnitude", minimum: 2, decrement: 1 },
+      selection: { type: "discard" },
+    },
+    defaultFailureBehaviour: { type: "discard" },
+  },
+  {
+    id: "echo-of-the-wild",
+    name: "Echo of the Wild",
+    description: "Spread forest, then copy this card into the discard pile.",
+    target: creepingWildsIITarget(),
+    conditions: [
+      { type: "terrain-is-not", terrain: "water" },
+      { type: "terrain-is-not", terrain: "chasm" },
+    ],
+    effects: [creepingWildsIIEffect()],
+    deckMutations: [
+      {
+        type: "copy-card",
+        selector: { type: "self" },
+        count: { type: "fixed", value: 1 },
+        destination: "discard",
+      },
+    ],
+  },
+  {
+    id: "the-law-changes",
+    name: "The Law Changes",
+    description:
+      "Mark the selected tile, then alter one random draw-pile card (+1 magnitude, altered tag).",
+    target: singlePrimaryTileTarget(),
+    conditions: [],
+    effects: [{ type: "add-tag", tag: "marked-by-law" }],
+    deckMutations: [
+      {
+        type: "modify-card",
+        selector: { type: "random-from-draw" },
+        modification: { type: "magnitude-adjustment", amount: 1 },
+      },
+      {
+        type: "modify-card",
+        selector: { type: "random-from-draw" },
+        modification: { type: "add-tag", tag: "altered" },
+      },
+    ],
+  },
+  {
+    id: "forgotten-instruction",
+    name: "Forgotten Instruction",
+    description:
+      "Mark a valid tile as forgotten, then retire one random discard-pile card.",
+    target: singlePrimaryTileTarget(),
+    conditions: [],
+    effects: [{ type: "add-tag", tag: "forgotten" }],
+    deckMutations: [
+      {
+        type: "retire-card",
+        selector: { type: "random-from-discard" },
+      },
+    ],
+  },
+  {
+    id: "second-attempt",
+    name: "Second Attempt",
+    description:
+      "Target a tile exactly four spaces away; retarget to three, then two, on failure.",
+    target: exactDistanceTarget(4),
+    conditions: [],
+    effects: [{ type: "add-tag", tag: "second-attempt" }],
+    failureBehaviours: {
+      selection: { type: "retarget", target: exactDistanceTarget(3) },
+      "target-requirements": { type: "retarget", target: exactDistanceTarget(2) },
+    },
+    defaultFailureBehaviour: { type: "fail" },
+  },
+  {
+    id: "lesser-consequence",
+    name: "Lesser Consequence",
+    description:
+      "Attempt a large forest spread; on failure apply a smaller effect to the selection.",
+    target: singlePrimaryTileTarget(),
+    conditions: [],
+    effects: [creepingWildsIIEffect()],
+    failureBehaviours: {
+      propagation: {
+        type: "apply-fallback-effect",
+        effects: [{ type: "add-tag", tag: "lesser-consequence" }],
+      },
+    },
+    defaultFailureBehaviour: { type: "fail" },
   },
 ];

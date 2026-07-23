@@ -1,8 +1,12 @@
+import type { DeckState } from "../deck/deckTypes";
+import { createInitialDeck, createMigrationDeckSeed } from "../deck/createInitialDeck";
+import { cards } from "../cards/cardDefinitions";
 import {
   CURRENT_WORLD_VERSION,
   type LegacyWorldStateV1,
   type LegacyWorldStateV2,
   type LegacyWorldStateV3,
+  type LegacyWorldStateV4,
   type MapTile,
   type SettlementRegion,
   type TileChange,
@@ -83,6 +87,19 @@ function isTargetResolutionRecord(value: unknown): value is TargetResolutionReco
     Array.isArray(value.selectedIds) &&
     Array.isArray(value.expandedTargetIds) &&
     isRecord(value.resolvedValues)
+  );
+}
+
+function isDeckState(value: unknown): value is DeckState {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    Array.isArray(value.drawPile) &&
+    Array.isArray(value.discardPile) &&
+    Array.isArray(value.retiredPile) &&
+    typeof value.shuffleCount === "number"
   );
 }
 
@@ -179,13 +196,40 @@ function normalizeLoadedWorld(data: WorldState): WorldState {
 
   return {
     ...data,
-    version: 4,
+    version: 5,
     turn: data.turn ?? 0,
     tiles,
     history,
     settlementRegions,
     travelRoutes,
+    deck: data.deck,
   };
+}
+
+function migrateV4ToV5(data: LegacyWorldStateV4): WorldState {
+  const base = normalizeLoadedWorld({
+    version: 5,
+    id: data.id,
+    name: data.name,
+    turn: data.turn ?? data.history.length,
+    tiles: data.tiles,
+    settlementRegions: data.settlementRegions ?? {},
+    travelRoutes: data.travelRoutes ?? {},
+    deck: createInitialDeck(
+      cards,
+      createMigrationDeckSeed({
+        id: data.id,
+        createdAt: data.createdAt,
+        version: 4,
+      }),
+      data.turn ?? 0,
+    ),
+    history: data.history.map((action) => normalizeWorldAction(action)),
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt,
+  });
+
+  return base;
 }
 
 function migrateV1ToV2(data: LegacyWorldStateV1): LegacyWorldStateV2 {
@@ -257,13 +301,19 @@ function migrateV2ToV3(data: LegacyWorldStateV2): LegacyWorldStateV3 {
     tiles,
     settlementRegions: buildSettlementHierarchy(
       {
-        version: 4,
+        version: 5,
         id: data.id,
         name: data.name,
         turn,
         tiles,
         settlementRegions: {},
         travelRoutes: {},
+        deck: {
+          drawPile: [],
+          discardPile: [],
+          retiredPile: [],
+          shuffleCount: 0,
+        },
         history,
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
@@ -276,7 +326,7 @@ function migrateV2ToV3(data: LegacyWorldStateV2): LegacyWorldStateV3 {
   };
 }
 
-function migrateV3ToV4(data: LegacyWorldStateV3): WorldState {
+function migrateV3ToV4(data: LegacyWorldStateV3): LegacyWorldStateV4 {
   const tiles = Object.fromEntries(
     Object.entries(data.tiles).map(([tileId, tile]) => [
       tileId,
@@ -285,7 +335,7 @@ function migrateV3ToV4(data: LegacyWorldStateV3): WorldState {
   );
   const history = data.history.map((action) => normalizeWorldAction(action));
 
-  return normalizeLoadedWorld({
+  return {
     version: 4,
     id: data.id,
     name: data.name,
@@ -296,10 +346,28 @@ function migrateV3ToV4(data: LegacyWorldStateV3): WorldState {
     history,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
-  });
+  };
 }
 
-function validateWorldV4(data: Record<string, unknown>): WorldState {
+function validateLegacyWorldV4(data: Record<string, unknown>): LegacyWorldStateV4 {
+  if (
+    typeof data.id !== "string" ||
+    typeof data.name !== "string" ||
+    typeof data.turn !== "number" ||
+    !isRecord(data.tiles) ||
+    !isRecord(data.settlementRegions) ||
+    !isRecord(data.travelRoutes) ||
+    !Array.isArray(data.history) ||
+    typeof data.createdAt !== "string" ||
+    typeof data.updatedAt !== "string"
+  ) {
+    throw new Error("The saved world is missing required fields.");
+  }
+
+  return data as unknown as LegacyWorldStateV4;
+}
+
+function validateWorldV5(data: Record<string, unknown>): WorldState {
   if (
     typeof data.id !== "string" ||
     typeof data.name !== "string" ||
@@ -339,6 +407,10 @@ function validateWorldV4(data: Record<string, unknown>): WorldState {
   }
 
   validateHistorySequence(data.history as WorldAction[]);
+
+  if (!isDeckState(data.deck)) {
+    throw new Error("The saved world is missing deck state.");
+  }
 
   return normalizeLoadedWorld(data as unknown as WorldState);
 }
@@ -438,22 +510,28 @@ export function parseWorld(json: string): WorldState {
   }
 
   if (data.version === 1) {
-    return migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(validateLegacyWorldV1(data))));
+    return migrateV4ToV5(
+      migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(validateLegacyWorldV1(data)))),
+    );
   }
 
   if (data.version === 2) {
-    return migrateV3ToV4(migrateV2ToV3(validateLegacyWorldV2(data)));
+    return migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(validateLegacyWorldV2(data))));
   }
 
   if (data.version === 3) {
-    return migrateV3ToV4(validateLegacyWorldV3(data));
+    return migrateV4ToV5(migrateV3ToV4(validateLegacyWorldV3(data)));
+  }
+
+  if (data.version === 4) {
+    return migrateV4ToV5(validateLegacyWorldV4(data));
   }
 
   if (data.version !== CURRENT_WORLD_VERSION) {
     throw new Error(`Unsupported world version: ${String(data.version)}`);
   }
 
-  return validateWorldV4(data);
+  return validateWorldV5(data);
 }
 
 export function serializeWorld(world: WorldState): string {

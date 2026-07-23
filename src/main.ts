@@ -2,8 +2,6 @@ import "leaflet/dist/leaflet.css";
 import "./style.css";
 
 import { cardRequiresTwoEndpoints } from "./cards/cardTypes";
-import { cards } from "./cards/cardDefinitions";
-import { drawRandomCard } from "./cards/drawCard";
 import {
   createWorldMap,
   renderWorldMap,
@@ -29,8 +27,11 @@ import {
   getPropagationAffectedTileIds,
   getPropagationSeedTileIds,
   getPropagationTraversedTileIds,
-  proposeAction,
 } from "./rules/engine";
+import {
+  proposeCardPlay,
+  resolveEffectiveCardForActiveInstance,
+} from "./rules/proposeCardPlay";
 import { createRandomSeed } from "./rules/random";
 import {
   handleTileSelection,
@@ -46,6 +47,10 @@ import {
   renderSidebar,
   type AppState,
 } from "./ui/sidebar";
+import {
+  commitDiscardActiveCard,
+  commitDrawCard,
+} from "./world/commitDeckAction";
 import { commitWorldAction } from "./world/commitWorldAction";
 import { commitTileCreation } from "./world/commitTileCreation";
 import {
@@ -108,10 +113,14 @@ function initializeWorld(): StartupResult {
 }
 
 function createInitialState(startup: StartupResult): AppState {
+  const drawnCard = startup.world
+    ? resolveEffectiveCardForActiveInstance(startup.world)?.card ?? null
+    : null;
+
   return {
     world: startup.world,
     selection: createEmptySelection("single"),
-    drawnCard: null,
+    drawnCard,
     proposedAction: null,
     selectedRouteId: null,
     statusMessage: startup.statusMessage,
@@ -124,9 +133,8 @@ function buildProposal(state: AppState) {
     return null;
   }
 
-  return proposeAction(
+  return proposeCardPlay(
     state.world,
-    state.drawnCard,
     state.selection.tileIds,
     state.proposedAction?.randomSeed ?? createRandomSeed(),
     state.selection,
@@ -332,22 +340,48 @@ function bootstrap(): void {
       return;
     }
 
-    const drawnCard = drawRandomCard();
-    const selectionMode = cardRequiresTwoEndpoints(drawnCard)
-      ? "two-endpoints"
-      : state.selection.mode;
+    if (state.world.deck.activeInstanceId) {
+      state = {
+        ...state,
+        statusMessage: "Discard or play the active card before drawing another.",
+      };
+      refresh();
+      return;
+    }
 
-    state = {
-      ...state,
-      drawnCard,
-      selection: createEmptySelection(selectionMode),
-      proposedAction: null,
-      selectedRouteId: null,
-      statusMessage: cardRequiresTwoEndpoints(drawnCard)
-        ? `Drew "${drawnCard.name}". Select a route origin, then a destination.`
-        : `Drew "${drawnCard.name}".`,
-    };
-    state.proposedAction = buildProposal(state);
+    try {
+      const drawResult = commitDrawCard(state.world);
+      const active = resolveEffectiveCardForActiveInstance(drawResult.world);
+
+      if (!active) {
+        throw new Error("The drawn card could not be resolved.");
+      }
+
+      const selectionMode = cardRequiresTwoEndpoints(active.card)
+        ? "two-endpoints"
+        : state.selection.mode;
+
+      state = {
+        ...state,
+        world: drawResult.world,
+        drawnCard: active.card,
+        selection: createEmptySelection(selectionMode),
+        proposedAction: null,
+        selectedRouteId: null,
+        statusMessage: cardRequiresTwoEndpoints(active.card)
+          ? `Drew "${active.card.name}". Select a route origin, then a destination.`
+          : drawResult.message,
+        loadError: null,
+      };
+      state.proposedAction = buildProposal(state);
+      refresh();
+      return;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "The card could not be drawn.";
+      state = { ...state, statusMessage: message };
+    }
+
     refresh();
   });
 
@@ -356,21 +390,45 @@ function bootstrap(): void {
       return;
     }
 
-    const drawnCard = cards.find((card) => card.id === "the-road-between");
-
-    if (!drawnCard) {
+    if (state.world.deck.activeInstanceId) {
+      state = {
+        ...state,
+        statusMessage: "Discard or play the active card before drawing another.",
+      };
+      refresh();
       return;
     }
 
-    state = {
-      ...state,
-      drawnCard,
-      selection: createEmptySelection("two-endpoints"),
-      proposedAction: null,
-      selectedRouteId: null,
-      statusMessage: `Drew "${drawnCard.name}". Select a route origin, then a destination.`,
-    };
-    state.proposedAction = buildProposal(state);
+    try {
+      const drawResult = commitDrawCard(state.world);
+      const active = resolveEffectiveCardForActiveInstance(drawResult.world);
+
+      if (!active) {
+        throw new Error("The drawn card could not be resolved.");
+      }
+
+      state = {
+        ...state,
+        world: drawResult.world,
+        drawnCard: active.card,
+        selection: createEmptySelection("two-endpoints"),
+        proposedAction: null,
+        selectedRouteId: null,
+        statusMessage:
+          active.card.id === "the-road-between"
+            ? `Drew "${active.card.name}". Select a route origin, then a destination.`
+            : `Drew "${active.card.name}" instead of The Road Between. Discard to draw again.`,
+        loadError: null,
+      };
+      state.proposedAction = buildProposal(state);
+      refresh();
+      return;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "The road card could not be drawn.";
+      state = { ...state, statusMessage: message };
+    }
+
     refresh();
   });
 
@@ -410,18 +468,29 @@ function bootstrap(): void {
   });
 
   sidebar.discardCardButton.addEventListener("click", () => {
-    if (!state.drawnCard) {
+    if (!state.world || !state.drawnCard) {
       return;
     }
 
     const discardedName = state.drawnCard.name;
-    state = {
-      ...state,
-      drawnCard: null,
-      proposedAction: null,
-      selectedRouteId: null,
-      statusMessage: `Discarded "${discardedName}".`,
-    };
+
+    try {
+      const result = commitDiscardActiveCard(state.world);
+      state = {
+        ...state,
+        world: result.world,
+        drawnCard: null,
+        proposedAction: null,
+        selectedRouteId: null,
+        statusMessage: `Discarded "${discardedName}".`,
+        loadError: null,
+      };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "The card could not be discarded.";
+      state = { ...state, statusMessage: message };
+    }
+
     refresh();
   });
 
