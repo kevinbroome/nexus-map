@@ -51,8 +51,22 @@
 
         <div class="sidebar-actions">
           <button id="draw-card" type="button">Draw card</button>
-          <button id="draw-road-card" type="button">Draw road card</button>
         </div>
+
+        <section id="card-panel" hidden>
+          <h2 id="card-name"></h2>
+          <p id="card-description"></p>
+          <p id="card-validation"></p>
+          <div class="card-actions">
+            <button id="apply-card" type="button" disabled>Apply</button>
+            <button id="discard-card" type="button">Discard</button>
+          </div>
+        </section>
+
+        <section id="preview-legend" class="preview-legend" hidden>
+          <h2>Preview legend</h2>
+          <ul id="preview-legend-list"></ul>
+        </section>
 
         <section id="deck-panel">
           <h2>Deck</h2>
@@ -135,21 +149,6 @@
             </fieldset>
           </div>
         </details>
-
-        <section id="preview-legend" class="preview-legend" hidden>
-          <h2>Preview legend</h2>
-          <ul id="preview-legend-list"></ul>
-        </section>
-
-        <section id="card-panel" hidden>
-          <h2 id="card-name"></h2>
-          <p id="card-description"></p>
-          <p id="card-validation"></p>
-          <div class="card-actions">
-            <button id="apply-card" type="button" disabled>Apply</button>
-            <button id="discard-card" type="button">Discard</button>
-          </div>
-        </section>
       </aside>
 
       <div id="map"></div>

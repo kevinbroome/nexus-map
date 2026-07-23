@@ -116,7 +116,7 @@ body {
 .sidebar-actions {
   display: grid;
   gap: 0.5rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .sidebar-actions button:disabled,
@@ -170,9 +170,11 @@ body {
 }
 
 #card-panel {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid #ccc;
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 0.5rem;
+  background: #fff;
 }
 
 #card-description {
@@ -237,9 +239,11 @@ body {
 }
 
 .preview-legend {
-  margin-top: 1rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid #d6d3d1;
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  border: 1px solid #d6d3d1;
+  border-radius: 0.5rem;
+  background: #fff;
 }
 
 .preview-legend h2 {

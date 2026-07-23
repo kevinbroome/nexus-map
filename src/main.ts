@@ -401,53 +401,6 @@ function bootstrap(): void {
     refresh();
   });
 
-  sidebar.drawRoadCardButton.addEventListener("click", () => {
-    if (!state.world) {
-      return;
-    }
-
-    if (state.world.deck.activeInstanceId) {
-      state = {
-        ...state,
-        statusMessage: "Discard or play the active card before drawing another.",
-      };
-      refresh();
-      return;
-    }
-
-    try {
-      const drawResult = commitDrawCard(state.world);
-      const active = resolveEffectiveCardForActiveInstance(drawResult.world);
-
-      if (!active) {
-        throw new Error("The drawn card could not be resolved.");
-      }
-
-      state = {
-        ...state,
-        world: drawResult.world,
-        drawnCard: active.card,
-        selection: createEmptySelection("two-endpoints"),
-        proposedAction: null,
-        selectedRouteId: null,
-        statusMessage:
-          active.card.id === "the-road-between"
-            ? `Drew "${active.card.name}". Select a route origin, then a destination.`
-            : `Drew "${active.card.name}" instead of The Road Between. Discard to draw again.`,
-        loadError: null,
-      };
-      state.proposedAction = buildProposal(state);
-      refresh();
-      return;
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "The road card could not be drawn.";
-      state = { ...state, statusMessage: message };
-    }
-
-    refresh();
-  });
-
   sidebar.applyCardButton.addEventListener("click", () => {
     if (!state.drawnCard || !state.world || !state.proposedAction) {
       return;

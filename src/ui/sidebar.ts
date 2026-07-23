@@ -72,7 +72,6 @@ export type SidebarElements = {
   createNewWorldButton: HTMLButtonElement;
   selectionModeInputs: NodeListOf<HTMLInputElement>;
   drawCardButton: HTMLButtonElement;
-  drawRoadCardButton: HTMLButtonElement;
   devExpandTileButton: HTMLButtonElement;
   devScenarioSelect: HTMLSelectElement;
   devLoadScenarioButton: HTMLButtonElement;
@@ -118,8 +117,6 @@ export function getSidebarElements(): SidebarElements {
     'input[name="selection-mode"]',
   );
   const drawCardButton = document.querySelector<HTMLButtonElement>("#draw-card");
-  const drawRoadCardButton =
-    document.querySelector<HTMLButtonElement>("#draw-road-card");
   const devExpandTileButton =
     document.querySelector<HTMLButtonElement>("#dev-expand-tile");
   const devScenarioSelect =
@@ -190,7 +187,6 @@ export function getSidebarElements(): SidebarElements {
     !createNewWorldButton ||
     selectionModeInputs.length === 0 ||
     !drawCardButton ||
-    !drawRoadCardButton ||
     !devExpandTileButton ||
     !devScenarioSelect ||
     !devLoadScenarioButton ||
@@ -230,7 +226,6 @@ export function getSidebarElements(): SidebarElements {
     createNewWorldButton,
     selectionModeInputs,
     drawCardButton,
-    drawRoadCardButton,
     devExpandTileButton,
     devScenarioSelect,
     devLoadScenarioButton,
@@ -660,8 +655,6 @@ export function renderSidebar(
   elements.recoveryPanel.hidden = state.loadError === null;
 
   elements.drawCardButton.disabled =
-    interactionsDisabled || Boolean(state.world?.deck.activeInstanceId);
-  elements.drawRoadCardButton.disabled =
     interactionsDisabled || Boolean(state.world?.deck.activeInstanceId);
   elements.discardCardButton.disabled =
     interactionsDisabled || !state.drawnCard;
