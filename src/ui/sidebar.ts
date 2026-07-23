@@ -726,6 +726,10 @@ export function renderSidebar(
     : "";
   elements.cloudDiagnostics.hidden = !import.meta.env.DEV;
   elements.cloudAuthPanel.hidden = !state.cloudAuthAvailable;
+  elements.cloudAuthPanel.classList.toggle(
+    "cloud-auth--signed-in",
+    state.authSignedIn,
+  );
   elements.authUserLabel.textContent = state.authSignedIn
     ? `Signed in as ${state.authUserLabel}`
     : "";
