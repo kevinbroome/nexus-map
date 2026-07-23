@@ -81,7 +81,6 @@ export type SidebarElements = {
   statusMessage: HTMLParagraphElement;
   recoveryPanel: HTMLElement;
   createNewWorldButton: HTMLButtonElement;
-  selectionModeInputs: NodeListOf<HTMLInputElement>;
   drawCardButton: HTMLButtonElement;
   devExpandTileButton: HTMLButtonElement;
   devScenarioSelect: HTMLSelectElement;
@@ -133,9 +132,6 @@ export function getSidebarElements(): SidebarElements {
   const recoveryPanel = document.querySelector<HTMLElement>("#recovery-panel");
   const createNewWorldButton = document.querySelector<HTMLButtonElement>(
     "#create-new-world",
-  );
-  const selectionModeInputs = document.querySelectorAll<HTMLInputElement>(
-    'input[name="selection-mode"]',
   );
   const drawCardButton = document.querySelector<HTMLButtonElement>("#draw-card");
   const devExpandTileButton =
@@ -228,7 +224,6 @@ export function getSidebarElements(): SidebarElements {
     !statusMessage ||
     !recoveryPanel ||
     !createNewWorldButton ||
-    selectionModeInputs.length === 0 ||
     !drawCardButton ||
     !devExpandTileButton ||
     !devScenarioSelect ||
@@ -277,7 +272,6 @@ export function getSidebarElements(): SidebarElements {
     statusMessage,
     recoveryPanel,
     createNewWorldButton,
-    selectionModeInputs,
     drawCardButton,
     devExpandTileButton,
     devScenarioSelect,
@@ -818,11 +812,6 @@ export function renderSidebar(
     elements.devInspectionPropagation.textContent = formatPropagationInspection(
       state.proposedAction,
     );
-  }
-
-  for (const input of elements.selectionModeInputs) {
-    input.checked = input.value === state.selection.mode;
-    input.disabled = interactionsDisabled;
   }
 
   if (state.drawnCard && state.world) {

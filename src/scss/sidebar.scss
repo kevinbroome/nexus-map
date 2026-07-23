@@ -17,6 +17,10 @@
 
   h1 {
     margin-top: 0;
+
+    @media only screen and (max-width: 768px) {
+      display: none;
+    }
   }
 
   h2 {
@@ -162,24 +166,6 @@
 .sidebar-actions button,
 .dev-actions button {
   @include panel-button;
-}
-
-#selection-modes {
-  margin: 0 0 1rem;
-  padding: $space-panel;
-  border: 1px solid $color-border;
-  border-radius: $radius-panel;
-
-  legend {
-    padding: 0 0.25rem;
-    font-size: 0.9rem;
-  }
-
-  label {
-    display: block;
-    margin-bottom: 0.35rem;
-    font-size: 0.9rem;
-  }
 }
 
 .sidebar-actions {
